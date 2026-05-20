@@ -1,0 +1,11 @@
+.gradle/
+/local.properties
+/build
+/app/build
+*.iml
+.idea/
+.kotlin/
+.playwright-mcp/
+web/node_modules/
+web/dist/
+notiflow_ui.xml
