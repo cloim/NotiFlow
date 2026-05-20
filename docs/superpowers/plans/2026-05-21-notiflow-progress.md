@@ -1,4 +1,4 @@
-# PROGRESS.md — NotiFlow
+# NotiFlow Progress
 
 상태 규칙
 - ✅ 완료

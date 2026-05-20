@@ -1,4 +1,4 @@
-# SPEC.md — NotiFlow (Android Notification Automation)
+# NotiFlow Product Spec
 
 ## 목표
 사용자가 지정한 앱의 알림을 모니터링하고, 형식 필터를 통과한 알림에 대해 지정 액션을 실행하는 Android 앱을 개발한다.

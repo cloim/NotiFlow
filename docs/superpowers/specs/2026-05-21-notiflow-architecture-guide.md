@@ -1,6 +1,6 @@
-# CLAUDE.md
+# NotiFlow Architecture Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This document describes the repository build commands, architecture, bridge API, and extension points for NotiFlow.
 
 ## Build Commands
 

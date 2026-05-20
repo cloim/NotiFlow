@@ -1,4 +1,4 @@
-# PLAN.md — NotiFlow
+# NotiFlow Implementation Plan
 
 ## Phase 1. Foundation
 - NotificationListenerService 수집 파이프라인
