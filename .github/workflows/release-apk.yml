@@ -71,7 +71,10 @@ jobs:
           ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
           ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
+          VERSION_NAME="${GITHUB_REF_NAME#v}"
           ./gradlew assembleDevDebug assembleProdRelease \
+            -PandroidVersionName="$VERSION_NAME" \
+            -PandroidVersionCode="$GITHUB_RUN_NUMBER" \
             -PandroidReleaseStoreFile="$RUNNER_TEMP/notiflow-release.jks" \
             -PandroidReleaseStorePassword="$ANDROID_RELEASE_KEYSTORE_PASSWORD" \
             -PandroidReleaseKeyAlias="$ANDROID_RELEASE_KEY_ALIAS" \

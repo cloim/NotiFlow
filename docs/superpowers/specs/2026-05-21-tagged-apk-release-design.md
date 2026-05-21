@@ -43,9 +43,7 @@ The workflow jobs should:
 10. Create or update the GitHub Release for the tag and upload both APKs.
 
 ## Release Notes and Versioning
-The workflow should use the tag name as the release name. The Android `versionName` and `versionCode` can stay source-controlled for the first iteration. Automatic version derivation from the tag is out of scope for this first implementation because the current project hardcodes `versionName = "1.0.4"` and `versionCode = 5`.
-
-If later needed, a follow-up can parse tags such as `v1.0.5` into `versionName` and derive `versionCode` from `github.run_number` or a repository variable.
+The workflow uses the tag name as the release name and passes the tag version into Gradle. For a tag such as `v1.0.7`, APKs should be built with `versionName = "1.0.7"`. The workflow derives `versionCode` from `github.run_number` so each tagged CI build has an increasing integer version code.
 
 ## Error Handling
 - If any signing secret is missing, the prod release build should fail clearly during the signing/build step.
@@ -75,5 +73,4 @@ CI verification:
 - Google Play upload.
 - Firebase App Distribution upload.
 - Automatic changelog generation.
-- Automatic Android version bumping from tags.
 - Generating a new release keystore.
