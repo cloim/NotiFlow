@@ -72,9 +72,9 @@ function parseHeaders(raw) {
   for (const line of text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)) {
     const idx = line.indexOf(":");
     if (idx <= 0 || idx === line.length - 1)
-      return { ok: false, error: `Invalid header: ${line}` };
+      return { ok: false, error: `헤더 형식이 올바르지 않습니다: ${line}` };
     const k = line.slice(0, idx).trim(), v = line.slice(idx + 1).trim();
-    if (!k || !v) return { ok: false, error: `Invalid header: ${line}` };
+    if (!k || !v) return { ok: false, error: `헤더 형식이 올바르지 않습니다: ${line}` };
     headers[k] = v;
   }
   return { ok: true, headers };
@@ -233,9 +233,9 @@ function expressionRowsForSubmit(groups, fallbackOp = "AND") {
       }))
       .filter((cond) => cond.type || cond.value);
 
-    if (!conds.length) return { ok: false, error: "Each group requires at least one condition." };
+    if (!conds.length) return { ok: false, error: "각 그룹에는 조건이 하나 이상 필요합니다." };
     if (conds.some((cond) => !cond.type || !cond.value)) {
-      return { ok: false, error: "Each condition requires both type and value." };
+      return { ok: false, error: "각 조건에는 유형과 값이 모두 필요합니다." };
     }
 
     conds.forEach((cond, idx) => {
@@ -253,7 +253,7 @@ function expressionRowsForSubmit(groups, fallbackOp = "AND") {
     }
   }
 
-  if (!rows.length) return { ok: false, error: "At least one condition required" };
+  if (!rows.length) return { ok: false, error: "조건이 하나 이상 필요합니다." };
   rows[rows.length - 1].operator = null;
 
   return { ok: true, rows, groups: normGroups };
@@ -265,12 +265,12 @@ function validateExpressionRows(rows) {
     const row = rows[i];
     depth += normParenCount(row.openParen);
     depth -= normParenCount(row.closeParen);
-    if (depth < 0) return { ok: false, error: "Invalid parentheses: too many closing ')'" };
+    if (depth < 0) return { ok: false, error: "괄호가 올바르지 않습니다. 닫는 괄호가 너무 많습니다." };
     if (i < rows.length - 1 && !["AND", "OR"].includes(String(row.operator ?? ""))) {
-      return { ok: false, error: `Row ${i + 1} requires AND/OR operator` };
+      return { ok: false, error: `${i + 1}번째 행에는 AND/OR 연산자가 필요합니다.` };
     }
   }
-  if (depth !== 0) return { ok: false, error: "Invalid parentheses: unmatched '('" };
+  if (depth !== 0) return { ok: false, error: "괄호가 올바르지 않습니다. 여는 괄호가 남아 있습니다." };
   return { ok: true };
 }
 
@@ -321,17 +321,17 @@ function buildDiff(base, draft) {
   if (!base || !draft) return [];
   const out = [];
   const push = (label, a, b) => { if (a !== b) out.push({ label, from: a || "(empty)", to: b || "(empty)" }); };
-  push("name", base.name, draft.name);
-  push("package", base.pkg, draft.pkg);
-  push("operator", base.op, draft.op);
-  push("conditions", base.conds, draft.conds);
+  push("이름", base.name, draft.name);
+  push("패키지", base.pkg, draft.pkg);
+  push("연산자", base.op, draft.op);
+  push("조건", base.conds, draft.conds);
   push("webhook.url", base.url, draft.url);
   push("webhook.method", base.method, draft.method);
   push("webhook.headers", base.headers, draft.headers);
   push("webhook.payload", base.payload, draft.payload);
   push("webhook.token", base.tokenMode, draft.tokenMode);
-  push("enabled", base.enabled, draft.enabled);
-  push("priority", base.priority, draft.priority);
+  push("활성화", base.enabled, draft.enabled);
+  push("우선순위", base.priority, draft.priority);
   return out;
 }
 
@@ -342,6 +342,15 @@ function logClass(result) {
   if (r.includes("FAILED")) return "f";
   if (r.includes("RETRY")) return "r";
   return "n";
+}
+function logResultLabel(result) {
+  const r = String(result ?? "").toUpperCase();
+  if (r === "ALL") return "전체";
+  if (r.includes("SUCCESS")) return "성공";
+  if (r.includes("FAILED")) return "실패";
+  if (r.includes("RETRY")) return "재시도";
+  if (r.includes("FILTER_NO_MATCH")) return "조건 불일치";
+  return result || "-";
 }
 function fmtTime(ts) {
   const d = new Date(Number(ts));
@@ -432,33 +441,33 @@ function RuleCard({ rule, onEdit, onToggle, onDelete, busy }) {
       <div className="rule-head">
         <div className="rule-icon"><Icon.Bell /></div>
         <div className="rule-info">
-          <div className="rule-name">{rule.name || `Rule #${rule.id}`}</div>
+          <div className="rule-name">{rule.name || `규칙 #${rule.id}`}</div>
           <div className="rule-pkg">{rule.targetPackages?.[0] ?? "—"}</div>
         </div>
       </div>
       <div className="rule-chips">
         <span className={`chip ${isEnabled ? "chip-green" : "chip-neutral"}`}>
-          {isEnabled ? "Active" : "Paused"}
+          {isEnabled ? "활성" : "일시 정지"}
         </span>
-        <span className="chip chip-neutral">{hasExpression ? "EXPR" : (rule.filterOperator ?? "AND")}</span>
+        <span className="chip chip-neutral">{hasExpression ? "조건식" : (rule.filterOperator ?? "AND")}</span>
         {condCount > 0 && (
-          <span className="chip chip-accent">{condCount} condition{condCount > 1 ? "s" : ""}</span>
+          <span className="chip chip-accent">조건 {condCount}개</span>
         )}
-        <span className="chip chip-neutral">p{rule.priority ?? 100}</span>
+        <span className="chip chip-neutral">우선 {rule.priority ?? 100}</span>
       </div>
       <div className="rule-btns">
         <button className="rule-btn edit" onClick={() => onEdit(rule)} disabled={busy}>
-          <Icon.Edit /> Edit
+          <Icon.Edit /> 수정
         </button>
         <button
           className={`rule-btn ${isEnabled ? "on" : "off"}`}
           onClick={() => onToggle(rule.id, !isEnabled)}
           disabled={busy}
         >
-          {isEnabled ? <><Icon.Pause /> Pause</> : <><Icon.Play /> Enable</>}
+          {isEnabled ? <><Icon.Pause /> 정지</> : <><Icon.Play /> 활성화</>}
         </button>
         <button className="rule-btn del" onClick={() => onDelete(rule.id)} disabled={busy}>
-          <Icon.Trash /> Delete
+          <Icon.Trash /> 삭제
         </button>
       </div>
     </div>
@@ -494,34 +503,34 @@ function RuleFormSheet({
       <div className={`sheet${open ? " open" : ""}`}>
         <div className="sheet-grab" />
         <div className="sheet-hdr">
-          <span className="sheet-title">{isEdit ? `Edit Rule #${form.id}` : "New Rule"}</span>
+          <span className="sheet-title">{isEdit ? `규칙 #${form.id} 수정` : "새 규칙"}</span>
           <button className="icon-btn" onClick={onClose}><Icon.X /></button>
         </div>
 
         <div className="sheet-body">
           {/* Package */}
           <div className="field">
-            <label className="field-lbl">Target Package</label>
+            <label className="field-lbl">대상 앱</label>
             <button
               type="button"
               className="field-input pkg-picker-btn"
               onClick={onOpenPackagePicker}
             >
               <span className={`pkg-picker-label${selectedAppLabel ? "" : " placeholder"}`}>
-                {selectedAppLabel || "Select app from installed list"}
+                {selectedAppLabel || "설치된 앱 목록에서 선택"}
               </span>
               <span className={`pkg-picker-package${form.packageName ? "" : " placeholder"}`}>
-                {form.packageName || "Tap to browse"}
+                {form.packageName || "탭해서 찾아보기"}
               </span>
             </button>
           </div>
 
           {/* Name */}
           <div className="field">
-            <label className="field-lbl">Rule Name <span style={{ color: "var(--t3)" }}>(optional)</span></label>
+            <label className="field-lbl">규칙 이름 <span style={{ color: "var(--t3)" }}>(선택)</span></label>
             <input
               className="field-input"
-              placeholder="Auto-generated if blank"
+              placeholder="비워두면 자동 생성"
               value={form.name}
               onChange={e => onSetField("name", e.target.value)}
             />
@@ -529,9 +538,9 @@ function RuleFormSheet({
 
           {/* Conditions */}
           <div className="field">
-            <label className="field-lbl">Conditions</label>
+            <label className="field-lbl">조건</label>
             <div className="conds-box">
-              <div className="cond-help">Add groups, then add conditions inside each group. Parentheses are generated automatically.</div>
+              <div className="cond-help">그룹을 추가한 뒤 각 그룹 안에 조건을 넣으세요. 괄호는 자동으로 생성됩니다.</div>
               <button className="add-group-btn" onClick={onAddGroup}>+ 그룹 추가</button>
 
               {form.groups.map((group, gIdx) => {
@@ -540,7 +549,7 @@ function RuleFormSheet({
                 return (
                   <div key={group.id} className="group-card">
                     <div className="group-head">
-                      <div className="group-title">Group {gIdx + 1}</div>
+                      <div className="group-title">그룹 {gIdx + 1}</div>
                       <button
                         className="group-del"
                         onClick={() => onRemoveGroup(group.id)}
@@ -559,27 +568,27 @@ function RuleFormSheet({
                               value={c.type}
                               onChange={(e) => onSetGroupCond(group.id, c.id, "type", e.target.value)}
                             >
-                              <option value="text.contains">text.contains</option>
-                              <option value="title.contains">title.contains</option>
-                              <option value="text.regex">text.regex</option>
+                              <option value="text.contains">본문 포함</option>
+                              <option value="title.contains">제목 포함</option>
+                              <option value="text.regex">본문 정규식</option>
                             </select>
                             <input
                               className="field-input cond-val"
-                              placeholder="Value"
+                              placeholder="값"
                               value={c.value}
                               onChange={(e) => onSetGroupCond(group.id, c.id, "value", e.target.value)}
                             />
                             <button
                               className="cond-add"
                               onClick={() => onAddCondInGroup(group.id, cIdx)}
-                              title="Add condition in this group"
+                              title="이 그룹에 조건 추가"
                             >
                               +
                             </button>
                             <button
                               className="cond-del"
                               onClick={() => onRemoveCondInGroup(group.id, c.id)}
-                              title="Delete condition"
+                              title="조건 삭제"
                             >
                               ×
                             </button>
@@ -590,7 +599,7 @@ function RuleFormSheet({
 
                     {group.conditions.length > 1 && (
                       <div className="group-op-row">
-                        <span className="cond-link-lbl">Within Group</span>
+                        <span className="cond-link-lbl">그룹 내부</span>
                         <div className="seg cond-seg">
                           {["AND", "OR"].map((op) => (
                             <button
@@ -607,7 +616,7 @@ function RuleFormSheet({
 
                     {!isLastGroup && (
                       <div className="group-op-row between">
-                        <span className="cond-link-lbl">To Next Group</span>
+                        <span className="cond-link-lbl">다음 그룹</span>
                         <div className="seg cond-seg">
                           {["AND", "OR"].map((op) => (
                             <button
@@ -626,8 +635,8 @@ function RuleFormSheet({
               })}
 
               <div className="expr-preview">
-                <span className="expr-preview-lbl">Expression</span>
-                <code className="expr-preview-code">{expressionPreview || "(empty)"}</code>
+                <span className="expr-preview-lbl">조건식</span>
+                <code className="expr-preview-code">{expressionPreview || "(비어 있음)"}</code>
               </div>
             </div>
           </div>
@@ -645,7 +654,7 @@ function RuleFormSheet({
 
           <div className="field-row">
             <div className="field">
-              <label className="field-lbl">Method</label>
+              <label className="field-lbl">메서드</label>
               <select
                 className="field-input"
                 value={form.webhookMethod}
@@ -655,7 +664,7 @@ function RuleFormSheet({
               </select>
             </div>
             <div className="field">
-              <label className="field-lbl">Priority</label>
+              <label className="field-lbl">우선순위</label>
               <input
                 className="field-input"
                 type="number"
@@ -666,7 +675,7 @@ function RuleFormSheet({
           </div>
 
           <div className="field">
-            <label className="field-lbl">Headers <span style={{ color: "var(--t3)" }}>(Key: Value, one per line)</span></label>
+            <label className="field-lbl">헤더 <span style={{ color: "var(--t3)" }}>(한 줄에 Key: Value)</span></label>
             <textarea
               className="field-input"
               placeholder={"X-App: NotiFlow\nAuthorization: Bearer ..."}
@@ -677,7 +686,7 @@ function RuleFormSheet({
           </div>
 
           <div className="field">
-            <label className="field-lbl">Payload Template <span style={{ color: "var(--t3)" }}>(optional)</span></label>
+            <label className="field-lbl">페이로드 템플릿 <span style={{ color: "var(--t3)" }}>(선택)</span></label>
             <textarea
               className="field-input"
               placeholder={'{"title":{{title}},"text":{{text}}}'}
@@ -689,11 +698,11 @@ function RuleFormSheet({
 
           <div className="field">
             <label className="field-lbl">
-              Token {isEdit ? "(blank = keep current)" : "(optional)"}
+              토큰 {isEdit ? "(비워두면 기존 값 유지)" : "(선택)"}
             </label>
             <input
               className="field-input"
-              placeholder="Bearer secret token"
+              placeholder="Bearer 비밀 토큰"
               type="password"
               value={form.token}
               onChange={e => onSetField("token", e.target.value)}
@@ -705,14 +714,14 @@ function RuleFormSheet({
                   checked={form.removeToken}
                   onChange={e => onSetField("removeToken", e.target.checked)}
                 />
-                Remove stored token
+                저장된 토큰 삭제
               </label>
             )}
           </div>
 
           {isEdit && diff.length > 0 && (
             <div className="diff-box">
-              <div className="diff-lbl">Changes</div>
+              <div className="diff-lbl">변경사항</div>
               {diff.map(d => (
                 <div key={d.label} className="diff-line">
                   <strong style={{ color: "var(--t1)" }}>{d.label}</strong>: {d.from} → {d.to}
@@ -723,9 +732,9 @@ function RuleFormSheet({
         </div>
 
         <div className="sheet-foot">
-          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>취소</button>
           <button className="btn btn-primary" onClick={onSubmit} disabled={busy}>
-            {isEdit ? "Save Changes" : "Create Rule"}
+            {isEdit ? "변경사항 저장" : "규칙 만들기"}
           </button>
         </div>
       </div>
@@ -770,14 +779,14 @@ function AppPickerDialog({
       <div className={`picker-backdrop${open ? " open" : ""}`} onClick={onClose} />
       <div className={`picker-dialog${open ? " open" : ""}`}>
         <div className="picker-head">
-          <span className="sheet-title">Select Target Package</span>
+          <span className="sheet-title">대상 앱 선택</span>
           <button className="icon-btn" onClick={onClose}><Icon.X /></button>
         </div>
 
         <div className="picker-body">
           <div className="picker-privacy-note">
-            Installed apps are shown only so you can choose a notification source for this rule.
-            NotiFlow saves only the package you select.
+            설치된 앱 목록은 이 규칙의 알림 출처를 고르기 위해서만 표시됩니다.
+            NotiFlow는 선택한 패키지만 저장합니다.
           </div>
 
           <label className="picker-toggle">
@@ -791,7 +800,7 @@ function AppPickerDialog({
 
           <input
             className="field-input"
-            placeholder="Search app label or package"
+            placeholder="앱 이름 또는 패키지 검색"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
           />
@@ -809,7 +818,7 @@ function AppPickerDialog({
             ) : errorMessage ? (
               <div className="picker-error" role="alert">{errorMessage}</div>
             ) : filteredApps.length === 0 ? (
-              <div className="picker-empty">No installed apps found.</div>
+              <div className="picker-empty">설치된 앱을 찾을 수 없습니다.</div>
             ) : (
               filteredApps.map((app) => (
                 <button
@@ -826,7 +835,7 @@ function AppPickerDialog({
         </div>
 
         <div className="picker-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-ghost" onClick={onClose}>취소</button>
         </div>
       </div>
     </>
@@ -840,7 +849,7 @@ function LogItem({ log }) {
     <div className="log-item">
       <div className={`log-dot ${cls}`} />
       <div className="log-body">
-        <div className={`log-result ${cls}`}>{log.result}</div>
+        <div className={`log-result ${cls}`}>{logResultLabel(log.result)}</div>
         <div className="log-pkg">#{log.ruleId} · {log.eventPackage}</div>
         {log.message && <div className="log-msg">{log.message}</div>}
       </div>
@@ -891,14 +900,14 @@ export default function App() {
     if (!native?.listRules) return;
     const r = parseBridge(native.listRules());
     if (r?.ok) setRules(r.data?.rules ?? []);
-    else showToast(r?.error ?? "Failed to load rules", "err");
+    else showToast(r?.error ?? "규칙을 불러오지 못했습니다.", "err");
   }, [native, showToast]);
 
   const loadLogs = useCallback(() => {
     if (!native?.listLogs) return;
     const r = parseBridge(native.listLogs(200));
     if (r?.ok) setLogs(r.data?.logs ?? []);
-    else showToast(r?.error ?? "Failed to load logs", "err");
+    else showToast(r?.error ?? "실행 로그를 불러오지 못했습니다.", "err");
   }, [native, showToast]);
 
   const loadPerm = useCallback(() => {
@@ -912,7 +921,7 @@ export default function App() {
   }, [native]);
 
   const loadInstalledApps = useCallback(async (includeSystem = true) => {
-    if (!native?.listInstalledApps) return { ok: false, error: "Bridge method missing", requestId: -1 };
+    if (!native?.listInstalledApps) return { ok: false, error: "앱 연결 기능을 사용할 수 없습니다.", requestId: -1 };
 
     const requestId = installedAppsRequestIdRef.current + 1;
     installedAppsRequestIdRef.current = requestId;
@@ -937,7 +946,7 @@ export default function App() {
         return { ok: true, requestId };
       }
 
-      const msg = r?.error ?? "Failed to load installed apps";
+      const msg = r?.error ?? "설치된 앱 목록을 불러오지 못했습니다.";
       setInstalledAppsError(msg);
       showToast(msg, "err");
       return { ok: false, error: msg, requestId };
@@ -1065,7 +1074,7 @@ export default function App() {
 
   const openPackagePicker = useCallback(async () => {
     if (!isNative) {
-      showToast("Bridge unavailable in browser mode", "err");
+      showToast("브라우저 모드에서는 앱 연결 기능을 사용할 수 없습니다.", "err");
       return;
     }
 
@@ -1159,10 +1168,10 @@ export default function App() {
       const raw = isEdit
         ? native?.updateRule?.(JSON.stringify(payload))
         : native?.createRule?.(JSON.stringify(payload));
-      if (!raw) { showToast("Bridge method missing", "err"); return; }
+      if (!raw) { showToast("앱 연결 기능을 사용할 수 없습니다.", "err"); return; }
       const r = parseBridge(raw);
-      if (!r?.ok) { showToast(r?.error ?? "Failed", "err"); return; }
-      showToast(isEdit ? "Rule updated" : "Rule created");
+      if (!r?.ok) { showToast(r?.error ?? "처리하지 못했습니다.", "err"); return; }
+      showToast(isEdit ? "규칙을 수정했습니다." : "규칙을 만들었습니다.");
       closeSheet();
       loadRules();
     } finally {
@@ -1175,18 +1184,18 @@ export default function App() {
     setBusy(true);
     try {
       const r = parseBridge(native.setRuleEnabled(ruleId, enabled));
-      if (r?.ok) { showToast(enabled ? "Rule enabled" : "Rule paused"); loadRules(); }
-      else showToast(r?.error ?? "Toggle failed", "err");
+      if (r?.ok) { showToast(enabled ? "규칙을 활성화했습니다." : "규칙을 일시 정지했습니다."); loadRules(); }
+      else showToast(r?.error ?? "상태를 변경하지 못했습니다.", "err");
     } finally { setBusy(false); }
   }, [native, showToast, loadRules]);
 
   const deleteRule = useCallback((ruleId) => {
-    if (!window.confirm(`Delete rule #${ruleId}?`)) return;
+    if (!window.confirm(`규칙 #${ruleId}을 삭제할까요?`)) return;
     setBusy(true);
     try {
       const r = parseBridge(native?.deleteRule?.(ruleId));
-      if (r?.ok) { showToast("Rule deleted"); loadRules(); }
-      else showToast(r?.error ?? "Delete failed", "err");
+      if (r?.ok) { showToast("규칙을 삭제했습니다."); loadRules(); }
+      else showToast(r?.error ?? "규칙을 삭제하지 못했습니다.", "err");
     } finally { setBusy(false); }
   }, [native, showToast, loadRules]);
 
@@ -1224,8 +1233,8 @@ export default function App() {
         <div className="tab-content">
           <div className="page-hdr">
             <div className="page-hdr-left">
-              <div className="page-title">Rules</div>
-              <div className="page-sub">{rules.length} automation rule{rules.length !== 1 ? "s" : ""}</div>
+              <div className="page-title">규칙</div>
+              <div className="page-sub">자동화 규칙 {rules.length}개</div>
             </div>
             <button className="icon-btn" onClick={refresh} disabled={busy}><Icon.Refresh /></button>
           </div>
@@ -1234,8 +1243,8 @@ export default function App() {
             <div className="card">
               <div className="empty">
                 <div className="empty-icon">🔔</div>
-                <div className="empty-title">No rules yet</div>
-                <div className="empty-desc">Tap the + button to create your first notification rule.</div>
+                <div className="empty-title">아직 규칙이 없습니다</div>
+                <div className="empty-desc">+ 버튼을 눌러 첫 알림 규칙을 만드세요.</div>
               </div>
             </div>
           ) : (
@@ -1258,8 +1267,8 @@ export default function App() {
         <div className="tab-content">
           <div className="page-hdr">
             <div className="page-hdr-left">
-              <div className="page-title">Logs</div>
-              <div className="page-sub">{filteredLogs.length} / {logs.length} entries</div>
+              <div className="page-title">실행 로그</div>
+              <div className="page-sub">{filteredLogs.length} / {logs.length}건</div>
             </div>
             <button className="icon-btn" onClick={loadLogs} disabled={busy}><Icon.Refresh /></button>
           </div>
@@ -1271,11 +1280,11 @@ export default function App() {
                 value={logFilters.result}
                 onChange={e => setLogFilters(f => ({ ...f, result: e.target.value }))}
               >
-                {resultOptions.map(r => <option key={r}>{r}</option>)}
+                {resultOptions.map(r => <option key={r} value={r}>{logResultLabel(r)}</option>)}
               </select>
               <input
                 className="field-input"
-                placeholder="Package filter"
+                placeholder="패키지 필터"
                 value={logFilters.pkg}
                 onChange={e => setLogFilters(f => ({ ...f, pkg: e.target.value }))}
               />
@@ -1300,7 +1309,7 @@ export default function App() {
                 style={{ fontSize: 13, padding: "7px 12px" }}
                 onClick={() => setLogFilters({ result: "ALL", pkg: "", from: "", to: "" })}
               >
-                Reset Filters
+                필터 초기화
               </button>
             )}
           </div>
@@ -1309,8 +1318,8 @@ export default function App() {
             <div className="card">
               <div className="empty">
                 <div className="empty-icon">📋</div>
-                <div className="empty-title">No logs found</div>
-                <div className="empty-desc">Trigger a notification to see execution results here.</div>
+                <div className="empty-title">실행 로그가 없습니다</div>
+                <div className="empty-desc">알림이 발생하면 실행 결과가 여기에 표시됩니다.</div>
               </div>
             </div>
           ) : (
@@ -1328,24 +1337,24 @@ export default function App() {
         <div className="tab-content">
           <div className="page-hdr">
             <div className="page-hdr-left">
-              <div className="page-title">Settings</div>
-              <div className="page-sub">App info & permissions</div>
+              <div className="page-title">설정</div>
+              <div className="page-sub">앱 정보 및 권한</div>
             </div>
             <button className="icon-btn" onClick={() => { loadAppInfo(); loadPerm(); }}><Icon.Refresh /></button>
           </div>
 
           <div className="settings-section">
-            <div className="section-lbl">Permission</div>
+            <div className="section-lbl">알림 접근 권한</div>
             <div className={`perm-card ${permEnabled === null ? "check" : permEnabled ? "ok" : "warn"}`}>
               <div className="perm-icon">{permEnabled === null ? "⏳" : permEnabled ? "🔔" : "🔕"}</div>
               <div>
                 <div className="perm-title">
-                  {permEnabled === null ? "Checking..." : permEnabled ? "Listener Active" : "Permission Required"}
+                  {permEnabled === null ? "확인 중..." : permEnabled ? "리스너 활성화됨" : "권한 필요"}
                 </div>
                 <div className="perm-desc">
                   {permEnabled
-                    ? "NotiFlow is listening for notifications."
-                    : "Grant notification access to start capturing."}
+                    ? "NotiFlow가 알림을 수신하고 있습니다."
+                    : "알림 수집을 시작하려면 알림 접근 권한을 허용하세요."}
                 </div>
               </div>
             </div>
@@ -1355,21 +1364,21 @@ export default function App() {
                 onClick={() => native?.openNotificationListenerSettings?.()}
                 disabled={!isNative}
               >
-                Open Listener Settings
+                리스너 설정 열기
               </button>
             )}
           </div>
 
           {appInfo && (
             <div className="settings-section">
-              <div className="section-lbl">App Info</div>
+              <div className="section-lbl">앱 정보</div>
               <div className="card">
                 {[
-                  ["App", appInfo.appName],
-                  ["Version", appInfo.versionName],
-                  ["Build", appInfo.versionCode],
-                  ["Package", appInfo.packageName],
-                  ["Platform", appInfo.platform],
+                  ["앱", appInfo.appName],
+                  ["버전", appInfo.versionName],
+                  ["빌드", appInfo.versionCode],
+                  ["패키지", appInfo.packageName],
+                  ["플랫폼", appInfo.platform],
                 ].map(([k, v]) => (
                   <div key={k} className="card-row">
                     <span className="card-key">{k}</span>
@@ -1381,14 +1390,14 @@ export default function App() {
           )}
 
           <div className="settings-section">
-            <div className="section-lbl">Statistics</div>
+            <div className="section-lbl">통계</div>
             <div className="card">
               {[
-                ["Total Rules", rules.length],
-                ["Active Rules", rules.filter(r => r.enabled).length],
-                ["Total Logs", logs.length],
-                ["Success", logs.filter(l => l.result?.includes("SUCCESS")).length],
-                ["Failed", logs.filter(l => l.result?.includes("FAILED")).length],
+                ["전체 규칙", rules.length],
+                ["활성 규칙", rules.filter(r => r.enabled).length],
+                ["전체 로그", logs.length],
+                ["성공", logs.filter(l => l.result?.includes("SUCCESS")).length],
+                ["실패", logs.filter(l => l.result?.includes("FAILED")).length],
               ].map(([k, v]) => (
                 <div key={k} className="card-row">
                   <span className="card-key">{k}</span>
@@ -1401,8 +1410,8 @@ export default function App() {
           {!isNative && (
             <div className="card card-body">
               <div style={{ fontSize: 13, color: "var(--t3)", lineHeight: 1.7 }}>
-                <strong style={{ color: "var(--amber)" }}>Browser mode</strong> — JS bridge unavailable.
-                Open this page from the NotiFlow Android app to enable full functionality.
+                <strong style={{ color: "var(--amber)" }}>브라우저 모드</strong> - 앱 연결 기능을 사용할 수 없습니다.
+                모든 기능을 사용하려면 NotiFlow Android 앱에서 이 화면을 여세요.
               </div>
             </div>
           )}
@@ -1411,7 +1420,7 @@ export default function App() {
 
       {/* ── FAB ───────────────────────────────────────────────────── */}
       {tab === "rules" && (
-        <button className="fab" onClick={openCreate} aria-label="Create rule">
+        <button className="fab" onClick={openCreate} aria-label="규칙 만들기">
           <Icon.Plus />
         </button>
       )}
@@ -1453,9 +1462,9 @@ export default function App() {
       {/* ── Bottom Nav ────────────────────────────────────────────── */}
       <nav className="bottom-nav">
         {[
-          { id: "rules",    label: "Rules",    Icon: Icon.Bell },
-          { id: "logs",     label: "Logs",     Icon: Icon.Log },
-          { id: "settings", label: "Settings", Icon: Icon.Settings },
+          { id: "rules",    label: "규칙",      Icon: Icon.Bell },
+          { id: "logs",     label: "로그",      Icon: Icon.Log },
+          { id: "settings", label: "설정",      Icon: Icon.Settings },
         ].map(({ id, label, Icon: I }) => (
           <button
             key={id}
