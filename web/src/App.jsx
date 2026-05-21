@@ -775,6 +775,11 @@ function AppPickerDialog({
         </div>
 
         <div className="picker-body">
+          <div className="picker-privacy-note">
+            Installed apps are shown only so you can choose a notification source for this rule.
+            NotiFlow saves only the package you select.
+          </div>
+
           <label className="picker-toggle">
             <input
               type="checkbox"
@@ -866,7 +871,7 @@ export default function App() {
   const [isPackageLoadingDialogOpen, setIsPackageLoadingDialogOpen] = useState(false);
   const [isPackagePickerOpen, setIsPackagePickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
-  const [includeSystemApps, setIncludeSystemApps] = useState(true);
+  const [includeSystemApps, setIncludeSystemApps] = useState(false);
   const toastTimer = useRef(null);
   const installedAppsRequestIdRef = useRef(0);
   const includeSystemAppsRef = useRef(includeSystemApps);

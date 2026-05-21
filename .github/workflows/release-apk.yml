@@ -1,4 +1,4 @@
-name: Release APK
+name: Release Android Artifacts
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release-apk:
-    name: Build and release APKs
+    name: Build and release Android artifacts
     runs-on: ubuntu-latest
 
     steps:
@@ -65,14 +65,14 @@ jobs:
       - name: Run Android tests and lint
         run: ./gradlew testDevDebugUnitTest lintDevDebug
 
-      - name: Build dev and prod APKs
+      - name: Build dev APK, prod APK, and prod AAB
         env:
           ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
           ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
           ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
           VERSION_NAME="${GITHUB_REF_NAME#v}"
-          ./gradlew assembleDevDebug assembleProdRelease \
+          ./gradlew assembleDevDebug assembleProdRelease bundleProdRelease \
             -PandroidVersionName="$VERSION_NAME" \
             -PandroidVersionCode="$GITHUB_RUN_NUMBER" \
             -PandroidReleaseStoreFile="$RUNNER_TEMP/notiflow-release.jks" \
@@ -88,6 +88,7 @@ jobs:
           mkdir -p release-assets
           cp app/build/outputs/apk/dev/debug/app-dev-debug.apk "release-assets/NotiFlow-dev-${TAG_NAME}.apk"
           cp app/build/outputs/apk/prod/release/app-prod-release.apk "release-assets/NotiFlow-prod-${TAG_NAME}.apk"
+          cp app/build/outputs/bundle/prodRelease/app-prod-release.aab "release-assets/NotiFlow-prod-${TAG_NAME}.aab"
           ls -la release-assets
 
       - name: Publish GitHub Release
@@ -96,5 +97,5 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: NotiFlow ${{ github.ref_name }}
-          files: release-assets/*.apk
+          files: release-assets/*
           fail_on_unmatched_files: true
