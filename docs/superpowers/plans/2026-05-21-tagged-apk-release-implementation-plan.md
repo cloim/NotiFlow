@@ -284,7 +284,7 @@ jobs:
           test -n "$ANDROID_RELEASE_KEY_PASSWORD" || { echo "ANDROID_RELEASE_KEY_PASSWORD is required" >&2; exit 1; }
 
       - name: Run Android tests and lint
-        run: ./gradlew testDebugUnitTest lintDevDebug
+        run: ./gradlew testDevDebugUnitTest lintDevDebug
 
       - name: Build dev and prod APKs
         env:
@@ -309,7 +309,8 @@ jobs:
           ls -la release-assets
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ github.ref_name }}
           name: NotiFlow ${{ github.ref_name }}
@@ -325,7 +326,7 @@ Run:
 rg --fixed-strings 'tags:' .github/workflows/release-apk.yml
 rg --fixed-strings 'ANDROID_RELEASE_KEYSTORE_BASE64' .github/workflows/release-apk.yml
 rg --fixed-strings 'assembleDevDebug assembleProdRelease' .github/workflows/release-apk.yml
-rg --fixed-strings 'softprops/action-gh-release@v2' .github/workflows/release-apk.yml
+rg --fixed-strings 'softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65' .github/workflows/release-apk.yml
 ```
 
 Expected: all commands find matches.
@@ -427,7 +428,7 @@ Expected: Vite build succeeds and `sync-assets` copies `web/dist` to `app/src/ma
 Run:
 
 ```powershell
-.\gradlew.bat clean testDebugUnitTest lintDevDebug assembleDevDebug
+.\gradlew.bat clean testDevDebugUnitTest lintDevDebug assembleDevDebug
 ```
 
 Expected: `BUILD SUCCESSFUL`, and `app/build/outputs/apk/dev/debug/app-dev-debug.apk` exists.

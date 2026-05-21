@@ -9,6 +9,7 @@ When a `v*` Git tag is pushed, GitHub Actions builds both development and produc
 - Keep development and production apps installable on the same device.
 - Use GitHub Releases as the initial distribution channel.
 - Trigger only on tags matching `v*`.
+- Pin the GitHub Release action to a full commit SHA.
 
 ## Android Build Model
 Add Android product flavors with a single flavor dimension, for example `environment`.
@@ -36,7 +37,7 @@ The workflow jobs should:
 4. Run `npm ci` in `web/`.
 5. Run `npm run build:android` in `web/` to refresh `app/src/main/assets/web`.
 6. Decode `ANDROID_RELEASE_KEYSTORE_BASE64` to a temporary keystore file outside the repository or under the runner temp directory.
-7. Run Android verification: `./gradlew testDebugUnitTest lintDevDebug`.
+7. Run Android verification: `./gradlew testDevDebugUnitTest lintDevDebug`.
 8. Build APKs: `./gradlew assembleDevDebug assembleProdRelease` with signing properties for prod release.
 9. Rename APKs to include the tag, for example `NotiFlow-dev-v1.0.5.apk` and `NotiFlow-prod-v1.0.5.apk`.
 10. Create or update the GitHub Release for the tag and upload both APKs.
@@ -61,7 +62,7 @@ If later needed, a follow-up can parse tags such as `v1.0.5` into `versionName` 
 ## Testing Strategy
 Local verification before merging the workflow:
 - `npm run build:android`
-- `./gradlew testDebugUnitTest lintDevDebug assembleDevDebug`
+- `./gradlew testDevDebugUnitTest lintDevDebug assembleDevDebug`
 - `./gradlew assembleProdRelease` with local signing properties only if a local keystore is available
 
 CI verification:
