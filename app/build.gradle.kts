@@ -12,6 +12,20 @@ val webAppUrl = (
     project.findProperty("notiflowWebAppUrl") as String?
 )?.trim().orEmpty().escapeForBuildConfig()
 
+fun signingProperty(name: String): String? =
+    (project.findProperty(name) as String?)?.trim()?.takeIf { it.isNotEmpty() }
+
+val releaseStoreFile = signingProperty("androidReleaseStoreFile")
+val releaseStorePassword = signingProperty("androidReleaseStorePassword")
+val releaseKeyAlias = signingProperty("androidReleaseKeyAlias")
+val releaseKeyPassword = signingProperty("androidReleaseKeyPassword")
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { it != null }
+
 android {
     namespace = "com.notiflow"
     compileSdk = 35
@@ -26,9 +40,34 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("releaseFromProperties") {
+            if (hasReleaseSigning) {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+        }
+        create("prod") {
+            dimension = "environment"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("releaseFromProperties")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
