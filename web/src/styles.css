@@ -31,6 +31,7 @@
   --r-pill: 999px;
 
   --nav-h:    60px;
+  --safe-t:   env(safe-area-inset-top, 0px);
   --safe-b:   env(safe-area-inset-bottom, 0px);
   --sheet-max: 92dvh;
 }
@@ -73,7 +74,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 16px;
+  padding-top: calc(var(--safe-t) + 16px);
 }
 
 /* ── Page Header ────────────────────────────────────────────────────── */
