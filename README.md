@@ -100,9 +100,9 @@ gradlew.bat testDevDebugUnitTest
 `v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK와 Play Store용 운영 AAB를 빌드하고 GitHub Release에 업로드합니다. 앱 내부 `versionName`은 태그에서 앞의 `v`를 제거한 값으로 설정됩니다. 예를 들어 `v1.0.8` 태그는 앱 버전 `1.0.8`로 빌드됩니다.
 
 생성 산출물:
-- 개발: `NotiFlow-dev-<tag>.apk` (`applicationId: com.notiflow.dev`, 앱 이름: NotiFlow Dev)
-- 운영: `NotiFlow-prod-<tag>.apk` (`applicationId: com.notiflow`, 앱 이름: NotiFlow)
-- Play Store 업로드용: `NotiFlow-prod-<tag>.aab` (`applicationId: com.notiflow`)
+- 개발: `NotiFlow-dev-<tag>.apk` (`applicationId: com.cloimism.notiflow.dev`, 앱 이름: NotiFlow Dev)
+- 운영: `NotiFlow-prod-<tag>.apk` (`applicationId: com.cloimism.notiflow`, 앱 이름: NotiFlow)
+- Play Store 업로드용: `NotiFlow-prod-<tag>.aab` (`applicationId: com.cloimism.notiflow`)
 
 필수 GitHub Secrets:
 - `ANDROID_RELEASE_KEYSTORE_BASE64`: 기존 release keystore 파일을 base64 인코딩한 값

@@ -37,11 +37,11 @@ val hasReleaseSigning = listOf(
 ).all { it != null }
 
 android {
-    namespace = "com.notiflow"
+    namespace = "com.cloimism.notiflow"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.notiflow"
+        applicationId = "com.cloimism.notiflow"
         minSdk = 23
         targetSdk = 35
         versionCode = androidVersionCode

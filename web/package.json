@@ -9,6 +9,7 @@
     "sync:android": "node scripts/sync-assets.mjs",
     "build:android": "npm run build && npm run sync:android",
     "test:android-icon": "node scripts/verify-android-app-icon.mjs",
+    "test:android-package": "node scripts/verify-android-package-id.mjs",
     "test:safe-area": "node scripts/verify-safe-area-css.mjs",
     "test:play-readiness": "node scripts/verify-play-readiness.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173"
