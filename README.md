@@ -71,7 +71,7 @@ npm run dev
 3. Android 앱을 개발 서버 URL로 실행
 ```bash
 cd ..
-gradlew.bat assembleDebug -PnotiflowWebAppUrl=http://10.0.2.2:5173
+gradlew.bat assembleDevDebug -PnotiflowWebAppUrl=http://10.0.2.2:5173
 ```
 
 실기기에서는 `10.0.2.2` 대신 PC의 LAN IP를 사용하세요.
@@ -92,8 +92,8 @@ sdk.dir=C:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
 ```
 3. 실행
 ```bash
-gradlew.bat assembleDebug
-gradlew.bat testDebugUnitTest
+gradlew.bat assembleDevDebug
+gradlew.bat testDevDebugUnitTest
 ```
 
 ## GitHub Actions APK 배포

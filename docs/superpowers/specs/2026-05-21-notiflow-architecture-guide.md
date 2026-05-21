@@ -7,11 +7,11 @@ This document describes the repository build commands, architecture, bridge API,
 ### Android
 ```bash
 # local.properties에 sdk.dir=D:/AndroidSDK 필요
-gradlew.bat assembleDebug
-gradlew.bat testDebugUnitTest
+gradlew.bat assembleDevDebug
+gradlew.bat testDevDebugUnitTest
 
 # 개발 서버 URL로 빌드 (에뮬레이터)
-gradlew.bat assembleDebug -PnotiflowWebAppUrl=http://10.0.2.2:5173
+gradlew.bat assembleDevDebug -PnotiflowWebAppUrl=http://10.0.2.2:5173
 # 실기기는 PC의 LAN IP 사용
 ```
 
@@ -25,7 +25,7 @@ npm run build:android  # 빌드 + app/src/main/assets/web/ 동기화
 
 단일 테스트 실행:
 ```bash
-gradlew.bat testDebugUnitTest --tests "com.vibe.notiflow.SomeTest"
+gradlew.bat testDevDebugUnitTest --tests "com.vibe.notiflow.SomeTest"
 ```
 
 ## Architecture Overview
