@@ -358,6 +358,12 @@ function fmtTime(ts) {
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
+function fmtBytes(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)}KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+}
 
 /* ── Icons ──────────────────────────────────────────────────────────── */
 const Icon = {
@@ -754,6 +760,39 @@ function PackageLoadingDialog({ open }) {
   );
 }
 
+function UpdateDialog({ open, updateInfo, busy, onInstall, onClose }) {
+  if (!open || !updateInfo?.available) return null;
+  const sizeText = fmtBytes(updateInfo.assetSize);
+  return (
+    <>
+      <div className="update-backdrop open" onClick={onClose} />
+      <div className="update-dialog open" role="dialog" aria-modal="true">
+        <div className="update-dialog-head">
+          <div>
+            <div className="update-title">새 버전 사용 가능</div>
+            <div className="update-desc">
+              현재 {updateInfo.currentVersionName}에서 {updateInfo.latestVersionName || updateInfo.latestTag}로 업데이트할 수 있습니다.
+            </div>
+          </div>
+          <button className="icon-btn" onClick={onClose}><Icon.X /></button>
+        </div>
+        <div className="update-dialog-body">
+          <div className="update-meta">
+            <span>{updateInfo.assetName}</span>
+            {sizeText && <span>{sizeText}</span>}
+          </div>
+        </div>
+        <div className="update-dialog-foot">
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>나중에</button>
+          <button className="btn btn-primary" onClick={onInstall} disabled={busy}>
+            {busy ? "다운로드 중..." : "업데이트 설치"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function AppPickerDialog({
   open,
   apps,
@@ -881,6 +920,10 @@ export default function App() {
   const [isPackagePickerOpen, setIsPackagePickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const [includeSystemApps, setIncludeSystemApps] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateChecked, setUpdateChecked] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const toastTimer = useRef(null);
   const installedAppsRequestIdRef = useRef(0);
   const includeSystemAppsRef = useRef(includeSystemApps);
@@ -919,6 +962,38 @@ export default function App() {
     if (!native?.getAppInfo) return;
     try { setAppInfo(JSON.parse(native.getAppInfo())); } catch {}
   }, [native]);
+
+  const checkForUpdate = useCallback(async (manual = false) => {
+    if (!native?.checkForUpdate) {
+      if (manual) showToast("업데이트 확인 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+
+    setUpdateBusy(true);
+    try {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => setTimeout(resolve, 0));
+      });
+
+      const r = parseBridge(native.checkForUpdate());
+      if (!r?.ok) {
+        if (manual) showToast(r?.error ?? "업데이트를 확인하지 못했습니다.", "err");
+        return;
+      }
+
+      const nextInfo = r.data ?? null;
+      setUpdateInfo(nextInfo);
+      setUpdateChecked(true);
+      if (nextInfo?.available) {
+        setIsUpdateDialogOpen(true);
+        showToast("새 버전이 있습니다.");
+      } else if (manual) {
+        showToast("최신 버전입니다.");
+      }
+    } finally {
+      setUpdateBusy(false);
+    }
+  }, [native, showToast]);
 
   const loadInstalledApps = useCallback(async (includeSystem = true) => {
     if (!native?.listInstalledApps) return { ok: false, error: "앱 연결 기능을 사용할 수 없습니다.", requestId: -1 };
@@ -964,6 +1039,14 @@ export default function App() {
   useEffect(() => {
     loadAppInfo(); refresh();
   }, [loadAppInfo, refresh]);
+
+  useEffect(() => {
+    if (!isNative) return undefined;
+    const timer = setTimeout(() => {
+      void checkForUpdate(false);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [isNative, checkForUpdate]);
 
   // Form helpers
   const setField = useCallback((k, v) => setFormState(f => ({ ...f, [k]: v })), []);
@@ -1121,6 +1204,30 @@ export default function App() {
     if (!form.packageName) return "";
     return installedApps.find((app) => app.packageName === form.packageName)?.appLabel ?? "";
   }, [form.packageName, installedApps]);
+
+  const installUpdate = useCallback(async () => {
+    if (!native?.installUpdate || !updateInfo?.downloadUrl || !updateInfo?.assetName) {
+      showToast("설치할 업데이트 파일을 찾지 못했습니다.", "err");
+      return;
+    }
+
+    setUpdateBusy(true);
+    try {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => setTimeout(resolve, 0));
+      });
+
+      const r = parseBridge(native.installUpdate(updateInfo.downloadUrl, updateInfo.assetName));
+      if (r?.ok) {
+        setIsUpdateDialogOpen(false);
+        showToast("설치 화면을 열었습니다.");
+      } else {
+        showToast(r?.error ?? "업데이트 설치를 시작하지 못했습니다.", "err");
+      }
+    } finally {
+      setUpdateBusy(false);
+    }
+  }, [native, updateInfo, showToast]);
 
   // Submit
   const submitRule = useCallback(() => {
@@ -1340,7 +1447,7 @@ export default function App() {
               <div className="page-title">설정</div>
               <div className="page-sub">앱 정보 및 권한</div>
             </div>
-            <button className="icon-btn" onClick={() => { loadAppInfo(); loadPerm(); }}><Icon.Refresh /></button>
+            <button className="icon-btn" onClick={() => { loadAppInfo(); loadPerm(); void checkForUpdate(true); }}><Icon.Refresh /></button>
           </div>
 
           <div className="settings-section">
@@ -1367,6 +1474,59 @@ export default function App() {
                 리스너 설정 열기
               </button>
             )}
+          </div>
+
+          <div className="settings-section">
+            <div className="section-lbl">업데이트</div>
+            <div className={`update-card${updateInfo?.available ? " available" : ""}`}>
+              <div className="update-card-main">
+                <div>
+                  <div className="update-title">
+                    {updateBusy
+                      ? "업데이트 확인 중..."
+                      : updateInfo?.available
+                        ? "새 버전 사용 가능"
+                        : updateChecked
+                          ? "최신 버전"
+                          : "업데이트 확인"}
+                  </div>
+                  <div className="update-desc">
+                    {updateInfo?.available
+                      ? `${updateInfo.currentVersionName} → ${updateInfo.latestVersionName || updateInfo.latestTag}`
+                      : updateChecked
+                        ? "설치된 버전이 최신 GitHub 릴리즈와 같습니다."
+                        : "앱 실행 시 GitHub 최신 릴리즈 APK를 확인합니다."}
+                  </div>
+                </div>
+                {updateInfo?.available && (
+                  <span className="chip chip-amber">{updateInfo.latestTag}</span>
+                )}
+              </div>
+              {updateInfo?.available && (
+                <div className="update-meta">
+                  <span>{updateInfo.assetName}</span>
+                  {fmtBytes(updateInfo.assetSize) && <span>{fmtBytes(updateInfo.assetSize)}</span>}
+                </div>
+              )}
+              <div className="update-actions">
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => void checkForUpdate(true)}
+                  disabled={!isNative || updateBusy}
+                >
+                  업데이트 확인
+                </button>
+                {updateInfo?.available && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={installUpdate}
+                    disabled={!isNative || updateBusy}
+                  >
+                    {updateBusy ? "다운로드 중..." : "업데이트 설치"}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {appInfo && (
@@ -1445,6 +1605,14 @@ export default function App() {
       />
 
       <PackageLoadingDialog open={isPackageLoadingDialogOpen} />
+
+      <UpdateDialog
+        open={isUpdateDialogOpen}
+        updateInfo={updateInfo}
+        busy={updateBusy}
+        onInstall={installUpdate}
+        onClose={() => setIsUpdateDialogOpen(false)}
+      />
 
       <AppPickerDialog
         open={isPackagePickerOpen}

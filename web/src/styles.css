@@ -107,6 +107,109 @@ body {
 .card-key { font-size: 14px; color: var(--t2); }
 .card-val { font-size: 14px; font-weight: 600; font-family: ui-monospace, monospace; color: var(--t1); }
 
+/* ── Update ────────────────────────────────────────────────────────── */
+.update-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.update-card.available {
+  border-color: rgba(245,158,11,.28);
+  background: color-mix(in srgb, var(--amber-dim) 28%, var(--card));
+}
+.update-card-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--t1);
+}
+.update-desc {
+  margin-top: 2px;
+  color: var(--t2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.update-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(15,23,42,.48);
+  color: var(--t2);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+.update-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.update-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .65);
+  z-index: 240;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.update-backdrop.open {
+  opacity: 1;
+  pointer-events: all;
+}
+.update-dialog {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 16px);
+  width: min(448px, calc(100% - 32px));
+  transform: translate(-50%, 18px);
+  z-index: 250;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.update-dialog.open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translate(-50%, 0);
+}
+.update-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.update-dialog-body {
+  padding: 14px 16px;
+}
+.update-dialog-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--border);
+}
+
 /* ── Rule Card ──────────────────────────────────────────────────────── */
 .rule-card {
   background: var(--card);
