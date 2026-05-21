@@ -365,6 +365,15 @@ body {
   padding: 14px 16px;
   overflow: hidden;
 }
+.picker-privacy-note {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  color: var(--t2);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .picker-toggle {
   display: inline-flex;
   align-items: center;

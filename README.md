@@ -96,12 +96,13 @@ gradlew.bat assembleDevDebug
 gradlew.bat testDevDebugUnitTest
 ```
 
-## GitHub Actions APK 배포
-`v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK를 빌드하고 GitHub Release에 업로드합니다. APK 내부 `versionName`은 태그에서 앞의 `v`를 제거한 값으로 설정됩니다. 예를 들어 `v1.0.7` 태그는 앱 버전 `1.0.7`로 빌드됩니다.
+## GitHub Actions Android 배포
+`v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK와 Play Store용 운영 AAB를 빌드하고 GitHub Release에 업로드합니다. 앱 내부 `versionName`은 태그에서 앞의 `v`를 제거한 값으로 설정됩니다. 예를 들어 `v1.0.8` 태그는 앱 버전 `1.0.8`로 빌드됩니다.
 
-생성 APK:
+생성 산출물:
 - 개발: `NotiFlow-dev-<tag>.apk` (`applicationId: com.notiflow.dev`, 앱 이름: NotiFlow Dev)
 - 운영: `NotiFlow-prod-<tag>.apk` (`applicationId: com.notiflow`, 앱 이름: NotiFlow)
+- Play Store 업로드용: `NotiFlow-prod-<tag>.aab` (`applicationId: com.notiflow`)
 
 필수 GitHub Secrets:
 - `ANDROID_RELEASE_KEYSTORE_BASE64`: 기존 release keystore 파일을 base64 인코딩한 값
@@ -119,6 +120,27 @@ Windows PowerShell에서 keystore를 base64로 인코딩하는 예:
 git tag v1.0.5
 git push origin v1.0.5
 ```
+
+## Play Store AAB 빌드
+Play Console에는 운영 flavor의 signed AAB를 업로드합니다.
+
+```powershell
+.\gradlew.bat bundleProdRelease `
+  -PandroidVersionName=1.0.9 `
+  -PandroidVersionCode=9 `
+  -PandroidReleaseStoreFile=C:\path\to\release.jks `
+  -PandroidReleaseStorePassword=YOUR_STORE_PASSWORD `
+  -PandroidReleaseKeyAlias=YOUR_KEY_ALIAS `
+  -PandroidReleaseKeyPassword=YOUR_KEY_PASSWORD
+```
+
+로컬 산출물 경로:
+- `app/build/outputs/bundle/prodRelease/app-prod-release.aab`
+
+Play 심사 전 체크:
+- `android.permission.QUERY_ALL_PACKAGES`는 제한 권한이므로 Play Console 권한 선언과 핵심 기능 소명이 필요합니다. 소명이 어렵다면 권한 제거 또는 더 좁은 package visibility 구현으로 바꿔야 합니다.
+- Notification Listener와 webhook 전달 기능은 알림 데이터 수집/전송 목적을 스토어 설명, 앱 내 안내, 개인정보처리방침, Data safety 항목에 정확히 써야 합니다.
+- Play Console 권한 선언 초안과 체크리스트는 `docs/play-store-readiness.md`에 정리되어 있습니다.
 
 ## 보안
 - 토큰은 DB/로그에 평문 저장하지 않음
