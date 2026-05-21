@@ -12,6 +12,16 @@ val webAppUrl = (
     project.findProperty("notiflowWebAppUrl") as String?
 )?.trim().orEmpty().escapeForBuildConfig()
 
+val androidVersionName = (project.findProperty("androidVersionName") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "1.0.4"
+val androidVersionCode = (project.findProperty("androidVersionCode") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?.toInt()
+    ?: 5
+
 fun signingProperty(name: String): String? =
     (project.findProperty(name) as String?)?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -34,8 +44,8 @@ android {
         applicationId = "com.notiflow"
         minSdk = 23
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.0.4"
+        versionCode = androidVersionCode
+        versionName = androidVersionName
         buildConfigField("String", "WEB_APP_URL", "\"$webAppUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

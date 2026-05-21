@@ -97,7 +97,7 @@ gradlew.bat testDevDebugUnitTest
 ```
 
 ## GitHub Actions APK 배포
-`v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK를 빌드하고 GitHub Release에 업로드합니다.
+`v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK를 빌드하고 GitHub Release에 업로드합니다. APK 내부 `versionName`은 태그에서 앞의 `v`를 제거한 값으로 설정됩니다. 예를 들어 `v1.0.7` 태그는 앱 버전 `1.0.7`로 빌드됩니다.
 
 생성 APK:
 - 개발: `NotiFlow-dev-<tag>.apk` (`applicationId: com.notiflow.dev`, 앱 이름: NotiFlow Dev)
