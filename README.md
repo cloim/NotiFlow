@@ -96,6 +96,30 @@ gradlew.bat assembleDebug
 gradlew.bat testDebugUnitTest
 ```
 
+## GitHub Actions APK 배포
+`v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK를 빌드하고 GitHub Release에 업로드합니다.
+
+생성 APK:
+- 개발: `NotiFlow-dev-<tag>.apk` (`applicationId: com.notiflow.dev`, 앱 이름: NotiFlow Dev)
+- 운영: `NotiFlow-prod-<tag>.apk` (`applicationId: com.notiflow`, 앱 이름: NotiFlow)
+
+필수 GitHub Secrets:
+- `ANDROID_RELEASE_KEYSTORE_BASE64`: 기존 release keystore 파일을 base64 인코딩한 값
+- `ANDROID_RELEASE_KEY_ALIAS`: release key alias
+- `ANDROID_RELEASE_KEYSTORE_PASSWORD`: keystore password
+- `ANDROID_RELEASE_KEY_PASSWORD`: key password
+
+Windows PowerShell에서 keystore를 base64로 인코딩하는 예:
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\release.jks")) | Set-Clipboard
+```
+
+배포 태그 예:
+```bash
+git tag v1.0.5
+git push origin v1.0.5
+```
+
 ## 보안
 - 토큰은 DB/로그에 평문 저장하지 않음
 - Rule 액션에는 `tokenRef`만 저장
