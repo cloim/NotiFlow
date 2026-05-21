@@ -17,7 +17,7 @@ if (!/const\s+\[includeSystemApps,\s*setIncludeSystemApps\]\s*=\s*useState\(fals
   failures.push("App picker must default the include-system-apps toggle to false");
 }
 
-if (!app.includes("Installed apps are shown only so you can choose a notification source for this rule.")) {
+if (!app.includes("설치된 앱 목록은 이 규칙의 알림 출처를 고르기 위해서만 표시됩니다.")) {
   failures.push("App picker must explain why installed apps are shown");
 }
 
