@@ -39,6 +39,9 @@ jobs:
         working-directory: web
         run: npm run build:android
 
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
       - name: Restore Android release keystore
         env:
           ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
