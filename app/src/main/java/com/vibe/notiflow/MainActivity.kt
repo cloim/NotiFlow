@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.webkit.JavascriptInterface
@@ -15,6 +17,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.content.FileProvider
 import com.cloimism.notiflow.BuildConfig
 import com.vibe.notiflow.di.ServiceLocator
 import com.vibe.notiflow.domain.engine.ConditionExpressionEvaluator
@@ -24,10 +27,16 @@ import com.vibe.notiflow.domain.model.ConditionExpressionRow
 import com.vibe.notiflow.domain.model.FilterOperator
 import com.vibe.notiflow.domain.model.FilterSpec
 import com.vibe.notiflow.domain.model.Rule
+import com.vibe.notiflow.update.GitHubReleaseUpdate
+import com.vibe.notiflow.update.UpdateCandidate
+import java.io.File
+import java.io.FileOutputStream
 import java.net.URI
 import java.util.Locale
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import androidx.webkit.WebViewAssetLoader
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -37,12 +46,15 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var assetLoader: WebViewAssetLoader
+    private val updateHttpClient = OkHttpClient()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -401,6 +413,99 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private suspend fun fetchLatestReleaseJson(): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(GitHubReleaseUpdate.LATEST_RELEASE_API_URL)
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "NotiFlow/${BuildConfig.VERSION_NAME}")
+            .build()
+
+        updateHttpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IllegalStateException("GitHub 릴리즈 확인 실패 (${response.code})")
+            }
+            response.body?.string() ?: throw IllegalStateException("GitHub 응답이 비어 있습니다.")
+        }
+    }
+
+    private fun updateCandidateJson(candidate: UpdateCandidate): JSONObject {
+        return JSONObject().apply {
+            put("available", candidate.available)
+            put("latestTag", candidate.latestTag)
+            put("latestVersionName", candidate.latestVersionName)
+            put("currentVersionName", BuildConfig.VERSION_NAME)
+            put("currentVersionCode", BuildConfig.VERSION_CODE)
+            put("releaseUrl", candidate.releaseUrl)
+            put("assetName", candidate.assetName)
+            put("downloadUrl", candidate.downloadUrl)
+            put("assetSize", candidate.assetSize)
+            put("flavor", if (isDevBuild()) "dev" else "prod")
+        }
+    }
+
+    private fun isDevBuild(): Boolean = BuildConfig.APPLICATION_ID.endsWith(".dev")
+
+    private fun canRequestApkInstall(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+            packageManager.canRequestPackageInstalls()
+    }
+
+    private fun openUnknownAppInstallSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        runOnUiThread {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+        }
+    }
+
+    private suspend fun downloadUpdateApk(downloadUrl: String, assetName: String): File =
+        withContext(Dispatchers.IO) {
+            val uri = URI(downloadUrl)
+            require(uri.scheme == "https") { "APK 다운로드 URL은 HTTPS여야 합니다." }
+
+            val safeAssetName = assetName
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                .ifBlank { "NotiFlow-update.apk" }
+            val updateDir = File(cacheDir, "updates").apply { mkdirs() }
+            val targetFile = File(updateDir, safeAssetName)
+
+            val request = Request.Builder()
+                .url(downloadUrl)
+                .header("User-Agent", "NotiFlow/${BuildConfig.VERSION_NAME}")
+                .build()
+
+            updateHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IllegalStateException("APK 다운로드 실패 (${response.code})")
+                }
+                val body = response.body ?: throw IllegalStateException("APK 다운로드 응답이 비어 있습니다.")
+                body.byteStream().use { input ->
+                    FileOutputStream(targetFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+
+            targetFile
+        }
+
+    private fun openApkInstaller(apkFile: File) {
+        val apkUri = FileProvider.getUriForFile(
+            this,
+            "$packageName.fileprovider",
+            apkFile
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
     inner class NotiFlowBridge {
         @JavascriptInterface
         fun getAppInfo(): String {
@@ -411,6 +516,40 @@ class MainActivity : ComponentActivity() {
                 put("packageName", packageName)
                 put("platform", "android")
             }.toString()
+        }
+
+        @JavascriptInterface
+        fun checkForUpdate(): String {
+            return runCatching {
+                val releaseJson = runBlocking { fetchLatestReleaseJson() }
+                val candidate = GitHubReleaseUpdate.parseLatestRelease(
+                    json = releaseJson,
+                    currentVersionName = BuildConfig.VERSION_NAME,
+                    isDevBuild = isDevBuild()
+                )
+                okResponse(updateCandidateJson(candidate))
+            }.getOrElse { errorResponse(it.message ?: "업데이트를 확인하지 못했습니다.") }
+        }
+
+        @JavascriptInterface
+        fun installUpdate(downloadUrl: String, assetName: String): String {
+            return runCatching {
+                if (!canRequestApkInstall()) {
+                    openUnknownAppInstallSettings()
+                    return errorResponse("APK 설치 권한을 허용한 뒤 다시 시도하세요.")
+                }
+
+                val apkFile = runBlocking {
+                    downloadUpdateApk(downloadUrl = downloadUrl, assetName = assetName)
+                }
+                runOnUiThread { openApkInstaller(apkFile) }
+                okResponse(
+                    JSONObject().apply {
+                        put("assetName", apkFile.name)
+                        put("bytes", apkFile.length())
+                    }
+                )
+            }.getOrElse { errorResponse(it.message ?: "업데이트를 설치하지 못했습니다.") }
         }
 
         @JavascriptInterface

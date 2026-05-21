@@ -10,6 +10,7 @@
     "build:android": "npm run build && npm run sync:android",
     "test:android-icon": "node scripts/verify-android-app-icon.mjs",
     "test:android-package": "node scripts/verify-android-package-id.mjs",
+    "test:github-update": "node scripts/verify-github-update.mjs",
     "test:korean-ui": "node scripts/verify-korean-ui.mjs",
     "test:safe-area": "node scripts/verify-safe-area-css.mjs",
     "test:play-readiness": "node scripts/verify-play-readiness.mjs",
