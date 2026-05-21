@@ -4,7 +4,7 @@
 
 - Upload `app/build/outputs/bundle/prodRelease/app-prod-release.aab` to Play Console.
 - Tagged GitHub releases also publish `NotiFlow-prod-<tag>.aab`.
-- Use package name `com.notiflow` for the Play Store app.
+- Use package name `com.cloimism.notiflow` for the Play Store app.
 
 ## QUERY_ALL_PACKAGES Declaration
 

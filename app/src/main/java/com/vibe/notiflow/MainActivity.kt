@@ -15,7 +15,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
-import com.notiflow.BuildConfig
+import com.cloimism.notiflow.BuildConfig
 import com.vibe.notiflow.di.ServiceLocator
 import com.vibe.notiflow.domain.engine.ConditionExpressionEvaluator
 import com.vibe.notiflow.domain.model.ActionSpec
