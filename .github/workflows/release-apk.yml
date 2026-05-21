@@ -1,0 +1,93 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-apk:
+    name: Build and release APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build web assets for Android
+        working-directory: web
+        run: npm run build:android
+
+      - name: Restore Android release keystore
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_RELEASE_KEYSTORE_BASE64" ]; then
+            echo "ANDROID_RELEASE_KEYSTORE_BASE64 is required" >&2
+            exit 1
+          fi
+          echo "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/notiflow-release.jks"
+
+      - name: Verify required signing secrets
+        env:
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_RELEASE_KEY_ALIAS" || { echo "ANDROID_RELEASE_KEY_ALIAS is required" >&2; exit 1; }
+          test -n "$ANDROID_RELEASE_KEYSTORE_PASSWORD" || { echo "ANDROID_RELEASE_KEYSTORE_PASSWORD is required" >&2; exit 1; }
+          test -n "$ANDROID_RELEASE_KEY_PASSWORD" || { echo "ANDROID_RELEASE_KEY_PASSWORD is required" >&2; exit 1; }
+
+      - name: Run Android tests and lint
+        run: ./gradlew testDebugUnitTest lintDevDebug
+
+      - name: Build dev and prod APKs
+        env:
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleDevDebug assembleProdRelease \
+            -PandroidReleaseStoreFile="$RUNNER_TEMP/notiflow-release.jks" \
+            -PandroidReleaseStorePassword="$ANDROID_RELEASE_KEYSTORE_PASSWORD" \
+            -PandroidReleaseKeyAlias="$ANDROID_RELEASE_KEY_ALIAS" \
+            -PandroidReleaseKeyPassword="$ANDROID_RELEASE_KEY_PASSWORD"
+
+      - name: Prepare release assets
+        id: assets
+        shell: bash
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-manual}"
+          mkdir -p release-assets
+          cp app/build/outputs/apk/dev/debug/app-dev-debug.apk "release-assets/NotiFlow-dev-${TAG_NAME}.apk"
+          cp app/build/outputs/apk/prod/release/app-prod-release.apk "release-assets/NotiFlow-prod-${TAG_NAME}.apk"
+          ls -la release-assets
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: NotiFlow ${{ github.ref_name }}
+          files: release-assets/*.apk
+          fail_on_unmatched_files: true
