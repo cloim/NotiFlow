@@ -955,6 +955,8 @@ export default function App() {
   const [updateChecked, setUpdateChecked] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [themePreference, setThemePreference] = useState(getInitialThemePreference);
+  const [pcServerInfo, setPcServerInfo] = useState({ running: false, url: "" });
+  const [pcServerBusy, setPcServerBusy] = useState(false);
   const toastTimer = useRef(null);
   const installedAppsRequestIdRef = useRef(0);
   const includeSystemAppsRef = useRef(includeSystemApps);
@@ -1012,6 +1014,44 @@ export default function App() {
     if (!native?.getAppInfo) return;
     try { setAppInfo(JSON.parse(native.getAppInfo())); } catch {}
   }, [native]);
+
+  const loadPcSettingsServerStatus = useCallback(() => {
+    if (!native?.getPcSettingsServerStatus) return;
+    const r = parseBridge(native.getPcSettingsServerStatus());
+    if (r?.ok) setPcServerInfo(r.data ?? { running: false, url: "" });
+  }, [native]);
+
+  const startPcSettingsServer = useCallback(() => {
+    if (!native?.startPcSettingsServer) return;
+    setPcServerBusy(true);
+    try {
+      const r = parseBridge(native.startPcSettingsServer());
+      if (r?.ok) {
+        setPcServerInfo(r.data ?? { running: false, url: "" });
+        showToast("PC 설정 서버를 시작했습니다.");
+      } else {
+        showToast(r?.error ?? "PC 설정 서버를 시작하지 못했습니다.", "err");
+      }
+    } finally {
+      setPcServerBusy(false);
+    }
+  }, [native, showToast]);
+
+  const stopPcSettingsServer = useCallback(() => {
+    if (!native?.stopPcSettingsServer) return;
+    setPcServerBusy(true);
+    try {
+      const r = parseBridge(native.stopPcSettingsServer());
+      if (r?.ok) {
+        setPcServerInfo(r.data ?? { running: false, url: "" });
+        showToast("PC 설정 서버를 중지했습니다.");
+      } else {
+        showToast(r?.error ?? "PC 설정 서버를 중지하지 못했습니다.", "err");
+      }
+    } finally {
+      setPcServerBusy(false);
+    }
+  }, [native, showToast]);
 
   const checkForUpdate = useCallback(async (manual = false) => {
     if (!native?.checkForUpdate) {
@@ -1087,8 +1127,10 @@ export default function App() {
   }, [loadRules, loadLogs, loadPerm]);
 
   useEffect(() => {
-    loadAppInfo(); refresh();
-  }, [loadAppInfo, refresh]);
+    loadAppInfo();
+    loadPcSettingsServerStatus();
+    refresh();
+  }, [loadAppInfo, loadPcSettingsServerStatus, refresh]);
 
   useEffect(() => {
     if (!isNative) return undefined;
@@ -1390,7 +1432,7 @@ export default function App() {
     ? refresh
     : tab === "logs"
       ? loadLogs
-      : () => { loadAppInfo(); loadPerm(); void checkForUpdate(true); };
+      : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadPerm(); void checkForUpdate(true); };
   const topbarBusy = tab === "rules" || tab === "logs" ? busy : updateBusy;
 
   /* ── Render ── */
@@ -1552,6 +1594,41 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="section-lbl">PC 설정 서버</div>
+            <div className="pc-server-card">
+              <div>
+                <div className="pc-server-title">
+                  {pcServerInfo?.running ? "서버 실행 중" : "서버 꺼짐"}
+                </div>
+                <div className="pc-server-desc">
+                  같은 Wi-Fi의 PC 브라우저에서 규칙과 앱 정보를 설정할 수 있습니다.
+                </div>
+              </div>
+              {pcServerInfo?.running && (
+                <div className="pc-server-url">
+                  <span>{pcServerInfo.url}</span>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(pcServerInfo.url);
+                      showToast("접속 URL을 복사했습니다.");
+                    }}
+                  >
+                    복사
+                  </button>
+                </div>
+              )}
+              <button
+                className={pcServerInfo?.running ? "btn btn-ghost" : "btn btn-primary"}
+                onClick={pcServerInfo?.running ? stopPcSettingsServer : startPcSettingsServer}
+                disabled={!isNative || pcServerBusy}
+              >
+                {pcServerInfo?.running ? "서버 중지" : "서버 시작"}
+              </button>
             </div>
           </div>
 
