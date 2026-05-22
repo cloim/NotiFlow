@@ -13,6 +13,8 @@
     "test:github-update": "node scripts/verify-github-update.mjs",
     "test:korean-ui": "node scripts/verify-korean-ui.mjs",
     "test:safe-area": "node scripts/verify-safe-area-css.mjs",
+    "test:theme-ui": "node scripts/verify-theme-ui.mjs",
+    "test:topbar-ui": "node scripts/verify-topbar-ui.mjs",
     "test:play-readiness": "node scripts/verify-play-readiness.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
