@@ -29,6 +29,7 @@ import com.vibe.notiflow.domain.model.ConditionExpressionRow
 import com.vibe.notiflow.domain.model.FilterOperator
 import com.vibe.notiflow.domain.model.FilterSpec
 import com.vibe.notiflow.domain.model.Rule
+import com.vibe.notiflow.pc.PcSettingsServer
 import com.vibe.notiflow.update.GitHubReleaseUpdate
 import com.vibe.notiflow.update.UpdateCandidate
 import java.io.File
@@ -57,6 +58,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var assetLoader: WebViewAssetLoader
     private val updateHttpClient = OkHttpClient()
+    private val bridge = NotiFlowBridge()
+    private var pcSettingsServer: PcSettingsServer? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,7 +98,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             webChromeClient = WebChromeClient()
-            addJavascriptInterface(NotiFlowBridge(), "NotiFlowNative")
+            addJavascriptInterface(bridge, "NotiFlowNative")
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -114,6 +117,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        pcSettingsServer?.stop()
         webView.removeJavascriptInterface("NotiFlowNative")
         webView.destroy()
         super.onDestroy()
@@ -520,6 +524,35 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
+    private fun pcSettingsServerHandler(): PcSettingsServer.Handler =
+        object : PcSettingsServer.Handler {
+            override fun appInfo(): String = bridge.getAppInfo()
+            override fun notificationPermission(): Boolean = isNotificationListenerEnabled()
+            override fun listRules(): String = bridge.listRules()
+            override fun listLogs(limit: Int): String = bridge.listLogs(limit)
+            override fun listInstalledApps(includeSystem: Boolean): String =
+                bridge.listInstalledApps(includeSystem)
+            override fun createRule(inputJson: String): String = bridge.createRule(inputJson)
+            override fun updateRule(inputJson: String): String = bridge.updateRule(inputJson)
+            override fun setRuleEnabled(ruleId: Long, enabled: Boolean): String =
+                bridge.setRuleEnabled(ruleId, enabled)
+            override fun deleteRule(ruleId: Long): String = bridge.deleteRule(ruleId)
+        }
+
+    private fun pcSettingsServerStateJson(state: PcSettingsServer.State): JSONObject =
+        JSONObject().apply {
+            put("running", state.running)
+            put("url", state.url)
+            put("host", state.host)
+            put("port", state.port)
+            put("token", state.token)
+        }
+
+    private fun getPcSettingsServer(): PcSettingsServer =
+        pcSettingsServer ?: PcSettingsServer(applicationContext, pcSettingsServerHandler()).also {
+            pcSettingsServer = it
+        }
+
     inner class NotiFlowBridge {
         @JavascriptInterface
         fun getAppInfo(): String {
@@ -537,6 +570,25 @@ class MainActivity : ComponentActivity() {
             runOnUiThread {
                 this@MainActivity.setSystemBarsTheme(isLight)
             }
+        }
+
+        @JavascriptInterface
+        fun getPcSettingsServerStatus(): String {
+            return okResponse(pcSettingsServerStateJson(pcSettingsServer?.status() ?: PcSettingsServer.State(false)))
+        }
+
+        @JavascriptInterface
+        fun startPcSettingsServer(): String {
+            return runCatching {
+                okResponse(pcSettingsServerStateJson(getPcSettingsServer().start()))
+            }.getOrElse { errorResponse(it.message ?: "PC 설정 서버를 시작하지 못했습니다.") }
+        }
+
+        @JavascriptInterface
+        fun stopPcSettingsServer(): String {
+            return runCatching {
+                okResponse(pcSettingsServerStateJson(pcSettingsServer?.stop() ?: PcSettingsServer.State(false)))
+            }.getOrElse { errorResponse(it.message ?: "PC 설정 서버를 중지하지 못했습니다.") }
         }
 
         @JavascriptInterface
