@@ -1,6 +1,6 @@
 /* ── Design Tokens ──────────────────────────────────────────────────── */
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
 
   --bg:          #07090f;
   --surface:     #0d1120;
@@ -24,6 +24,10 @@
   --t1:   #eef2ff;
   --t2:   #94a3b8;
   --t3:   #475569;
+  --topbar-bg: rgba(10,14,24,.92);
+  --nav-bg: rgba(10,14,24,.88);
+  --bg-glow-a: rgba(99,102,241,.11);
+  --bg-glow-b: rgba(16,185,129,.07);
 
   --r:    14px;
   --r-sm: 8px;
@@ -31,14 +35,82 @@
   --r-pill: 999px;
 
   --nav-h:    60px;
+  --topbar-h: 64px;
   --safe-t:   env(safe-area-inset-top, 0px);
   --safe-b:   env(safe-area-inset-bottom, 0px);
   --sheet-max: 92dvh;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:          #f6f8fb;
+  --surface:     #ffffff;
+  --card:        #ffffff;
+  --card-hi:     #f1f5f9;
+  --border:      rgba(15,23,42,.10);
+  --border-hi:   rgba(15,23,42,.18);
+
+  --accent:      #4f46e5;
+  --accent-hi:   #4338ca;
+  --accent-dim:  rgba(79,70,229,.11);
+  --accent-glow: rgba(79,70,229,.20);
+
+  --green:       #047857;
+  --green-dim:   rgba(5,150,105,.11);
+  --red:         #dc2626;
+  --red-dim:     rgba(220,38,38,.10);
+  --amber:       #b45309;
+  --amber-dim:   rgba(245,158,11,.13);
+
+  --t1:   #0f172a;
+  --t2:   #475569;
+  --t3:   #64748b;
+  --topbar-bg: rgba(255,255,255,.88);
+  --nav-bg: rgba(255,255,255,.90);
+  --bg-glow-a: rgba(79,70,229,.10);
+  --bg-glow-b: rgba(5,150,105,.08);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]),
+  :root[data-theme="system"] {
+    --bg:          #f6f8fb;
+    --surface:     #ffffff;
+    --card:        #ffffff;
+    --card-hi:     #f1f5f9;
+    --border:      rgba(15,23,42,.10);
+    --border-hi:   rgba(15,23,42,.18);
+
+    --accent:      #4f46e5;
+    --accent-hi:   #4338ca;
+    --accent-dim:  rgba(79,70,229,.11);
+    --accent-glow: rgba(79,70,229,.20);
+
+    --green:       #047857;
+    --green-dim:   rgba(5,150,105,.11);
+    --red:         #dc2626;
+    --red-dim:     rgba(220,38,38,.10);
+    --amber:       #b45309;
+    --amber-dim:   rgba(245,158,11,.13);
+
+    --t1:   #0f172a;
+    --t2:   #475569;
+    --t3:   #64748b;
+    --topbar-bg: rgba(255,255,255,.88);
+    --nav-bg: rgba(255,255,255,.90);
+    --bg-glow-a: rgba(79,70,229,.10);
+    --bg-glow-b: rgba(5,150,105,.08);
+  }
+}
+
 /* ── Reset ──────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+html, body, #root { min-height: 100%; }
 button, input, textarea, select { font: inherit; color: inherit; }
 input, textarea, select { background: transparent; border: none; outline: none; }
 button { cursor: pointer; border: none; background: none; -webkit-tap-highlight-color: transparent; }
@@ -53,11 +125,14 @@ body {
   color: var(--t1);
   background: var(--bg);
   background-image:
-    radial-gradient(ellipse 70% 45% at 0% 0%,  rgba(99,102,241,.11) 0%, transparent 65%),
-    radial-gradient(ellipse 50% 40% at 100% 90%, rgba(16,185,129,.07) 0%, transparent 65%);
+    radial-gradient(ellipse 70% 45% at 0% 0%,  var(--bg-glow-a) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 40% at 100% 90%, var(--bg-glow-b) 0%, transparent 65%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+}
+#root {
+  background: var(--bg);
 }
 
 /* ── App Shell ──────────────────────────────────────────────────────── */
@@ -66,6 +141,7 @@ body {
   margin: 0 auto;
   min-height: 100dvh;
   position: relative;
+  background: var(--bg);
 }
 
 .tab-content {
@@ -74,10 +150,55 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: calc(var(--safe-t) + 16px);
+  padding-top: calc(var(--safe-t) + var(--topbar-h) + 16px);
+  background: var(--bg);
 }
 
-/* ── Page Header ────────────────────────────────────────────────────── */
+/* ── Top Bar ────────────────────────────────────────────────────────── */
+.app-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: 480px;
+  height: calc(var(--safe-t) + var(--topbar-h));
+  margin: 0 auto;
+  padding: calc(var(--safe-t) + 10px) 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  z-index: 120;
+}
+.topbar-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.topbar-title {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-subtitle {
+  font-size: 12.5px;
+  color: var(--t3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-action {
+  flex-shrink: 0;
+}
+
 .page-hdr {
   display: flex;
   align-items: flex-start;
@@ -313,7 +434,7 @@ body {
   margin: 0 auto;
   height: calc(var(--nav-h) + var(--safe-b));
   padding-bottom: var(--safe-b);
-  background: rgba(10,14,24,.88);
+  background: var(--nav-bg);
   border-top: 1px solid var(--border);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -882,7 +1003,7 @@ select.field-input {
 
 /* datetime-local: OS 피커와 다크 테마 맞춤 */
 input[type="datetime-local"].field-input {
-  color-scheme: dark;
+  color-scheme: inherit;
   padding-right: 13px;
   font-size: 12px;
 }
@@ -922,6 +1043,29 @@ input[type="datetime-local"].field-input {
   padding: 0 4px;
 }
 
+.theme-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.theme-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--t1);
+}
+.theme-desc {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--t2);
+}
+.theme-seg {
+  width: 100%;
+}
+.theme-seg .seg-opt {
+  min-width: 0;
+}
+
 .perm-card {
   display: flex; align-items: center; gap: 14px;
   padding: 16px;
@@ -934,6 +1078,23 @@ input[type="datetime-local"].field-input {
 .perm-icon { font-size: 30px; flex-shrink: 0; }
 .perm-title { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
 .perm-desc  { font-size: 13px; color: var(--t2); }
+
+.browser-mode-card {
+  padding: 16px;
+  border-radius: var(--r);
+  border: 1px solid color-mix(in srgb, var(--amber) 22%, var(--border-hi));
+  background:
+    linear-gradient(0deg, var(--amber-dim), var(--amber-dim)),
+    var(--card);
+}
+.browser-mode-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--t2);
+}
+.browser-mode-text strong {
+  color: var(--amber);
+}
 
 /* ── Toast ──────────────────────────────────────────────────────────── */
 .toast {

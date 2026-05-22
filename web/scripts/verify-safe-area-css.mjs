@@ -13,8 +13,8 @@ if (!/--safe-t:\s*env\(safe-area-inset-top,\s*0px\);/.test(css)) {
 }
 
 const tabContent = css.match(/\.tab-content\s*\{(?<body>[\s\S]*?)\}/)?.groups?.body ?? "";
-if (!/padding-top:\s*calc\(var\(--safe-t\)\s*\+\s*16px\);/.test(tabContent)) {
-  failures.push(".tab-content padding-top must include --safe-t plus the existing 16px spacing");
+if (!/padding-top:\s*calc\(var\(--safe-t\)\s*\+\s*var\(--topbar-h\)\s*\+\s*16px\);/.test(tabContent)) {
+  failures.push(".tab-content padding-top must include --safe-t, --topbar-h, and 16px spacing");
 }
 
 if (failures.length > 0) {

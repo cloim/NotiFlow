@@ -9,6 +9,27 @@ function parseBridge(raw) {
   try { return JSON.parse(raw); } catch { return { ok: false, error: raw }; }
 }
 
+/* ── Theme ──────────────────────────────────────────────────────────── */
+const THEME_STORAGE_KEY = "notiflow.theme";
+const THEME_OPTIONS = [
+  { id: "system", label: "시스템" },
+  { id: "light", label: "라이트" },
+  { id: "dark", label: "다크" },
+];
+function normalizeThemePreference(value) {
+  return THEME_OPTIONS.some((option) => option.id === value) ? value : "system";
+}
+function getInitialThemePreference() {
+  if (typeof window === "undefined") return "system";
+  return normalizeThemePreference(window.localStorage?.getItem(THEME_STORAGE_KEY));
+}
+function applyThemePreference(preference) {
+  if (typeof document === "undefined") return;
+  const nextTheme = normalizeThemePreference(preference);
+  document.documentElement.setAttribute("data-theme", nextTheme);
+  document.documentElement.style.colorScheme = nextTheme === "system" ? "light dark" : nextTheme;
+}
+
 /* ── Helpers ────────────────────────────────────────────────────────── */
 function condId() { return `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
 function groupId() { return `g_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
@@ -924,6 +945,7 @@ export default function App() {
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateChecked, setUpdateChecked] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [themePreference, setThemePreference] = useState(getInitialThemePreference);
   const toastTimer = useRef(null);
   const installedAppsRequestIdRef = useRef(0);
   const includeSystemAppsRef = useRef(includeSystemApps);
@@ -937,6 +959,11 @@ export default function App() {
   useEffect(() => {
     includeSystemAppsRef.current = includeSystemApps;
   }, [includeSystemApps]);
+
+  useEffect(() => {
+    applyThemePreference(themePreference);
+    window.localStorage?.setItem(THEME_STORAGE_KEY, themePreference);
+  }, [themePreference]);
 
   // Data loading
   const loadRules = useCallback(() => {
@@ -1330,22 +1357,42 @@ export default function App() {
     });
   }, [logs, logFilters]);
 
+  const topbarTitle = tab === "rules" ? "규칙" : tab === "logs" ? "실행 로그" : "설정";
+  const topbarSubtitle = tab === "rules"
+    ? `자동화 규칙 ${rules.length}개`
+    : tab === "logs"
+      ? `${filteredLogs.length} / ${logs.length}건`
+      : "앱 정보 및 권한";
+  const topbarAction = tab === "rules"
+    ? refresh
+    : tab === "logs"
+      ? loadLogs
+      : () => { loadAppInfo(); loadPerm(); void checkForUpdate(true); };
+  const topbarBusy = tab === "rules" || tab === "logs" ? busy : updateBusy;
+
   /* ── Render ── */
   return (
     <div className="app">
       <Toast toast={toast} />
 
+      <header className="app-topbar">
+        <div className="topbar-copy">
+          <div className="topbar-title">{topbarTitle}</div>
+          <div className="topbar-subtitle">{topbarSubtitle}</div>
+        </div>
+        <button
+          className="icon-btn topbar-action"
+          onClick={topbarAction}
+          disabled={topbarBusy}
+          aria-label="새로고침"
+        >
+          <Icon.Refresh />
+        </button>
+      </header>
+
       {/* ── Rules Tab ─────────────────────────────────────────────── */}
       {tab === "rules" && (
         <div className="tab-content">
-          <div className="page-hdr">
-            <div className="page-hdr-left">
-              <div className="page-title">규칙</div>
-              <div className="page-sub">자동화 규칙 {rules.length}개</div>
-            </div>
-            <button className="icon-btn" onClick={refresh} disabled={busy}><Icon.Refresh /></button>
-          </div>
-
           {rules.length === 0 ? (
             <div className="card">
               <div className="empty">
@@ -1372,14 +1419,6 @@ export default function App() {
       {/* ── Logs Tab ──────────────────────────────────────────────── */}
       {tab === "logs" && (
         <div className="tab-content">
-          <div className="page-hdr">
-            <div className="page-hdr-left">
-              <div className="page-title">실행 로그</div>
-              <div className="page-sub">{filteredLogs.length} / {logs.length}건</div>
-            </div>
-            <button className="icon-btn" onClick={loadLogs} disabled={busy}><Icon.Refresh /></button>
-          </div>
-
           <div className="card card-body" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div className="log-filters">
               <select
@@ -1442,14 +1481,6 @@ export default function App() {
       {/* ── Settings Tab ──────────────────────────────────────────── */}
       {tab === "settings" && (
         <div className="tab-content">
-          <div className="page-hdr">
-            <div className="page-hdr-left">
-              <div className="page-title">설정</div>
-              <div className="page-sub">앱 정보 및 권한</div>
-            </div>
-            <button className="icon-btn" onClick={() => { loadAppInfo(); loadPerm(); void checkForUpdate(true); }}><Icon.Refresh /></button>
-          </div>
-
           <div className="settings-section">
             <div className="section-lbl">알림 접근 권한</div>
             <div className={`perm-card ${permEnabled === null ? "check" : permEnabled ? "ok" : "warn"}`}>
@@ -1474,6 +1505,31 @@ export default function App() {
                 리스너 설정 열기
               </button>
             )}
+          </div>
+
+          <div className="settings-section">
+            <div className="section-lbl">테마</div>
+            <div className="card card-body">
+              <div className="theme-row">
+                <div>
+                  <div className="theme-title">화면 테마</div>
+                  <div className="theme-desc">기본값은 기기의 시스템 테마를 따릅니다.</div>
+                </div>
+                <div className="seg theme-seg" role="radiogroup" aria-label="테마 선택">
+                  {THEME_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      className={`seg-opt${themePreference === option.id ? " active" : ""}`}
+                      role="radio"
+                      aria-checked={themePreference === option.id}
+                      onClick={() => setThemePreference(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="settings-section">
@@ -1568,9 +1624,9 @@ export default function App() {
           </div>
 
           {!isNative && (
-            <div className="card card-body">
-              <div style={{ fontSize: 13, color: "var(--t3)", lineHeight: 1.7 }}>
-                <strong style={{ color: "var(--amber)" }}>브라우저 모드</strong> - 앱 연결 기능을 사용할 수 없습니다.
+            <div className="browser-mode-card">
+              <div className="browser-mode-text">
+                <strong>브라우저 모드</strong> - 앱 연결 기능을 사용할 수 없습니다.
                 모든 기능을 사용하려면 NotiFlow Android 앱에서 이 화면을 여세요.
               </div>
             </div>
