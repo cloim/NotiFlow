@@ -49,7 +49,7 @@ class PcSettingsServer(
     private var state: State = State(running = false)
 
     @Synchronized
-    fun start(): State {
+    fun start(configuredToken: String? = null): State {
         if (active.get()) return state
 
         val socket = runCatching { ServerSocket(preferredPort) }
@@ -57,9 +57,9 @@ class PcSettingsServer(
         socket.reuseAddress = true
 
         val host = localIpAddress()
-        val token = newToken()
+        val token = configuredToken?.trim()?.takeIf { it.isNotBlank() } ?: newToken()
         val port = socket.localPort
-        val url = "http://$host:$port/?token=$token"
+        val url = settingsUrl(host, port, token)
 
         serverSocket = socket
         executor = Executors.newCachedThreadPool()
@@ -73,6 +73,21 @@ class PcSettingsServer(
             }
         }
 
+        return state
+    }
+
+    @Synchronized
+    fun setToken(token: String): State {
+        val nextToken = token.trim().ifBlank { newToken() }
+        val current = state
+        state = if (current.running) {
+            current.copy(
+                token = nextToken,
+                url = settingsUrl(current.host, current.port, nextToken)
+            )
+        } else {
+            State(running = false, token = nextToken)
+        }
         return state
     }
 
@@ -218,6 +233,9 @@ class PcSettingsServer(
     }
 
     private fun adminHtml(): String = ADMIN_HTML.replace("__TOKEN__", state.token)
+
+    private fun settingsUrl(host: String, port: Int, token: String): String =
+        "http://$host:$port/?token=$token"
 
     private fun htmlResponse(body: String): String = httpResponse(
         status = 200,

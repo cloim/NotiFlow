@@ -2,6 +2,7 @@ package com.vibe.notiflow
 
 import android.annotation.SuppressLint
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
@@ -60,6 +61,9 @@ class MainActivity : ComponentActivity() {
     private val updateHttpClient = OkHttpClient()
     private val bridge = NotiFlowBridge()
     private var pcSettingsServer: PcSettingsServer? = null
+    private val pcSettingsPrefs by lazy {
+        getSharedPreferences("pc_settings", Context.MODE_PRIVATE)
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -546,12 +550,28 @@ class MainActivity : ComponentActivity() {
             put("host", state.host)
             put("port", state.port)
             put("token", state.token)
+            put("configuredToken", getConfiguredPcSettingsToken())
         }
 
     private fun getPcSettingsServer(): PcSettingsServer =
         pcSettingsServer ?: PcSettingsServer(applicationContext, pcSettingsServerHandler()).also {
             pcSettingsServer = it
         }
+
+    private fun getConfiguredPcSettingsToken(): String =
+        pcSettingsPrefs.getString(PREF_PC_SETTINGS_TOKEN, "").orEmpty()
+
+    private fun validatePcSettingsToken(token: String) {
+        if (!Regex("^[A-Za-z0-9._~-]{6,64}$").matches(token)) {
+            throw IllegalArgumentException("토큰은 영문, 숫자, . _ ~ - 조합으로 6~64자여야 합니다.")
+        }
+    }
+
+    private fun savePcSettingsToken(token: String) {
+        validatePcSettingsToken(token)
+        pcSettingsPrefs.edit().putString(PREF_PC_SETTINGS_TOKEN, token).apply()
+        pcSettingsServer?.setToken(token)
+    }
 
     inner class NotiFlowBridge {
         @JavascriptInterface
@@ -578,9 +598,11 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
-        fun startPcSettingsServer(): String {
+        fun startPcSettingsServer(token: String): String {
             return runCatching {
-                okResponse(pcSettingsServerStateJson(getPcSettingsServer().start()))
+                val trimmedToken = token.trim()
+                if (trimmedToken.isNotBlank()) savePcSettingsToken(trimmedToken)
+                okResponse(pcSettingsServerStateJson(getPcSettingsServer().start(getConfiguredPcSettingsToken())))
             }.getOrElse { errorResponse(it.message ?: "PC 설정 서버를 시작하지 못했습니다.") }
         }
 
@@ -589,6 +611,14 @@ class MainActivity : ComponentActivity() {
             return runCatching {
                 okResponse(pcSettingsServerStateJson(pcSettingsServer?.stop() ?: PcSettingsServer.State(false)))
             }.getOrElse { errorResponse(it.message ?: "PC 설정 서버를 중지하지 못했습니다.") }
+        }
+
+        @JavascriptInterface
+        fun setPcSettingsServerToken(token: String): String {
+            return runCatching {
+                savePcSettingsToken(token.trim())
+                okResponse(pcSettingsServerStateJson(pcSettingsServer?.status() ?: PcSettingsServer.State(false)))
+            }.getOrElse { errorResponse(it.message ?: "PC 설정 서버 토큰을 저장하지 못했습니다.") }
         }
 
         @JavascriptInterface
@@ -811,5 +841,9 @@ class MainActivity : ComponentActivity() {
                 okResponse(JSONObject().put("ruleId", ruleId))
             }.getOrElse { errorResponse(it.message ?: "failed to delete rule") }
         }
+    }
+
+    private companion object {
+        private const val PREF_PC_SETTINGS_TOKEN = "pc_settings_token"
     }
 }
