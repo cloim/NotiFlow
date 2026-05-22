@@ -6,6 +6,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
 const app = read("web/src/App.jsx");
 const css = read("web/src/styles.css");
+const mainActivity = read("app/src/main/java/com/vibe/notiflow/MainActivity.kt");
 const pkg = JSON.parse(read("web/package.json"));
 
 const failures = [];
@@ -14,8 +15,11 @@ for (const text of [
   "THEME_STORAGE_KEY",
   "notiflow.theme",
   "applyThemePreference",
+  "resolveThemePreference",
+  "matchMedia",
   "themePreference",
   "setThemePreference",
+  "setSystemBarsTheme",
   "시스템",
   "라이트",
   "다크",
@@ -26,6 +30,21 @@ for (const text of [
 
 if (!app.includes('data-theme')) {
   failures.push("App must apply the selected theme to documentElement data-theme");
+}
+if (!app.includes('native?.setSystemBarsTheme?.(resolvedTheme === "light")')) {
+  failures.push("App must sync the resolved web theme to native system bar icon contrast");
+}
+if (!app.includes('"(prefers-color-scheme: light)"')) {
+  failures.push("System theme must listen to prefers-color-scheme changes");
+}
+if (!mainActivity.includes("fun setSystemBarsTheme(isLight: Boolean)")) {
+  failures.push("MainActivity must expose setSystemBarsTheme to the web bridge");
+}
+if (!mainActivity.includes("isAppearanceLightStatusBars = isLight")) {
+  failures.push("MainActivity must set status bar icon contrast from the resolved theme");
+}
+if (!mainActivity.includes("window.statusBarColor")) {
+  failures.push("MainActivity must set a status bar background that matches the resolved theme");
 }
 if (!app.includes("browser-mode-card")) {
   failures.push("Browser mode notice must use a dedicated theme-aware class");
