@@ -1,6 +1,7 @@
 package com.vibe.notiflow
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -11,7 +12,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebChromeClient.FileChooserParams
 import android.webkit.WebSettings
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -19,8 +22,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
+import androidx.webkit.WebViewAssetLoader
 import com.cloimism.notiflow.BuildConfig
 import com.vibe.notiflow.di.ServiceLocator
 import com.vibe.notiflow.domain.engine.ConditionExpressionEvaluator
@@ -30,18 +35,21 @@ import com.vibe.notiflow.domain.model.ConditionExpressionRow
 import com.vibe.notiflow.domain.model.FilterOperator
 import com.vibe.notiflow.domain.model.FilterSpec
 import com.vibe.notiflow.domain.model.Rule
+import com.vibe.notiflow.domain.transfer.RuleTransfer
 import com.vibe.notiflow.pc.PcSettingsServer
 import com.vibe.notiflow.update.GitHubReleaseUpdate
 import com.vibe.notiflow.update.UpdateCandidate
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStreamWriter
 import java.net.URI
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import androidx.webkit.WebViewAssetLoader
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -61,8 +69,40 @@ class MainActivity : ComponentActivity() {
     private val updateHttpClient = OkHttpClient()
     private val bridge = NotiFlowBridge()
     private var pcSettingsServer: PcSettingsServer? = null
+    private var pendingFileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingExportFileName: String? = null
+    private var pendingExportContent: String? = null
     private val pcSettingsPrefs by lazy {
         getSharedPreferences("pc_settings", Context.MODE_PRIVATE)
+    }
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = pendingFileChooserCallback ?: return@registerForActivityResult
+        pendingFileChooserCallback = null
+        val uris = if (result.resultCode == Activity.RESULT_OK) {
+            FileChooserParams.parseResult(result.resultCode, result.data)
+                ?: result.data?.data?.let { arrayOf(it) }
+        } else {
+            null
+        }
+        callback.onReceiveValue(uris)
+    }
+    private val createJsonDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val content = pendingExportContent
+        clearPendingExport()
+        val uri = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || uri == null || content == null) return@registerForActivityResult
+
+        runCatching {
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
+                    writer.write(content)
+                }
+            } ?: error("failed to open output stream")
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -101,7 +141,29 @@ class MainActivity : ComponentActivity() {
                     return assetLoader.shouldInterceptRequest(uri)
                 }
             }
-            webChromeClient = WebChromeClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    pendingFileChooserCallback?.onReceiveValue(null)
+                    pendingFileChooserCallback = filePathCallback
+                    return runCatching {
+                        val intent = fileChooserParams?.createIntent()
+                            ?: Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "application/json"
+                            }
+                        fileChooserLauncher.launch(intent)
+                        true
+                    }.getOrElse {
+                        pendingFileChooserCallback = null
+                        filePathCallback?.onReceiveValue(null)
+                        false
+                    }
+                }
+            }
             addJavascriptInterface(bridge, "NotiFlowNative")
         }
 
@@ -135,6 +197,65 @@ class MainActivity : ComponentActivity() {
         }
 
         webView.loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
+    }
+
+    private fun runOnUiThreadAndWait(block: () -> Unit) {
+        if (mainLooper.isCurrentThread) {
+            block()
+            return
+        }
+
+        val latch = CountDownLatch(1)
+        val failure = AtomicReference<Throwable?>()
+        runOnUiThread {
+            try {
+                block()
+            } catch (error: Throwable) {
+                failure.set(error)
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await()
+        failure.get()?.let { throw it }
+    }
+
+    private fun safeJsonFileName(fileName: String): String {
+        val safeName = Regex("[^A-Za-z0-9._-]").replace(fileName.trim(), "_").trim('_')
+        val baseName = if (safeName.isBlank() || safeName == "." || safeName == "..") {
+            "notiflow-rules"
+        } else {
+            safeName
+        }
+        return ensureJsonFileName(baseName)
+    }
+
+    private fun ensureJsonFileName(fileName: String): String {
+        return if (fileName.endsWith(".json", ignoreCase = true)) fileName else "$fileName.json"
+    }
+
+    private fun clearPendingExport() {
+        pendingExportFileName = null
+        pendingExportContent = null
+    }
+
+    private fun launchJsonSavePicker(fileName: String, content: String) {
+        runOnUiThreadAndWait {
+            pendingExportFileName = safeJsonFileName(fileName)
+            pendingExportContent = content
+            try {
+                createJsonDocumentLauncher.launch(
+                    Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/json"
+                        putExtra(Intent.EXTRA_TITLE, pendingExportFileName)
+                    }
+                )
+            } catch (error: Throwable) {
+                clearPendingExport()
+                throw error
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -312,6 +433,16 @@ class MainActivity : ComponentActivity() {
         return config["headers"]?.jsonObject?.mapNotNull { (key, value) ->
             value.jsonPrimitive.contentOrNull?.let { key to it }
         }?.toMap().orEmpty()
+    }
+
+    private fun importedTokenRefs(rule: Rule): List<String> {
+        return rule.actions
+            .filter { it.type == "webhook.post" }
+            .mapNotNull { action -> action.config["tokenRef"]?.jsonPrimitive?.contentOrNull }
+    }
+
+    private fun rollbackImportedSecrets(aliases: List<String>) {
+        aliases.forEach { alias -> ServiceLocator.secureStore.removeSecret(alias) }
     }
 
     private fun buildRuleFromInput(input: JSONObject, existing: Rule?): Rule {
@@ -767,6 +898,62 @@ class MainActivity : ComponentActivity() {
                 }
                 okResponse(JSONObject().put("rules", items))
             }.getOrElse { errorResponse(it.message ?: "failed to load rules") }
+        }
+
+        @JavascriptInterface
+        fun exportRules(inputJson: String): String {
+            return runCatching {
+                val input = JSONObject(inputJson)
+                val ruleIdsJson = input.optJSONArray("ruleIds") ?: JSONArray()
+                val ruleIds = (0 until ruleIdsJson.length()).map { index ->
+                    ruleIdsJson.getLong(index)
+                }.toSet()
+                val includeSecrets = input.optBoolean("includeSecrets", false)
+                val rules = runBlocking { ServiceLocator.ruleRepository.getAllRules() }
+                val exported = RuleTransfer.exportRules(
+                    rules = rules,
+                    selectedRuleIds = ruleIds,
+                    includeSecrets = includeSecrets,
+                    tokenResolver = { alias -> ServiceLocator.secureStore.getSecret(alias) },
+                    nowMillis = { System.currentTimeMillis() }
+                )
+
+                okResponse(JSONObject().put("export", exported))
+            }.getOrElse { errorResponse(it.message ?: "failed to export rules") }
+        }
+
+        @JavascriptInterface
+        fun importRules(inputJson: String): String {
+            return runCatching {
+                val createdTokenRefs = mutableListOf<String>()
+                val ruleIds = try {
+                    val inputs = RuleTransfer.importRuleInputs(JSONObject(inputJson))
+                    val rules = inputs.map { input ->
+                        buildRuleFromInput(input, existing = null).also { rule ->
+                            createdTokenRefs += importedTokenRefs(rule)
+                        }
+                    }
+                    runBlocking { ServiceLocator.ruleRepository.upsertRules(rules) }
+                } catch (error: Throwable) {
+                    rollbackImportedSecrets(createdTokenRefs)
+                    throw error
+                }
+
+                okResponse(
+                    JSONObject().apply {
+                        put("imported", ruleIds.size)
+                        put("ruleIds", JSONArray(ruleIds))
+                    }
+                )
+            }.getOrElse { errorResponse(it.message ?: "failed to import rules") }
+        }
+
+        @JavascriptInterface
+        fun saveJsonFile(fileName: String, content: String): String {
+            return runCatching {
+                launchJsonSavePicker(fileName, content)
+                okResponse(JSONObject().put("fileName", safeJsonFileName(fileName)))
+            }.getOrElse { errorResponse(it.message ?: "failed to start JSON save") }
         }
 
         @JavascriptInterface

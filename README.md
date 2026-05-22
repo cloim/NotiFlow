@@ -23,6 +23,8 @@ WebView에서 `window.NotiFlowNative` 객체를 사용할 수 있습니다.
 - `updateRule(inputJson: string): string(JSON)`
 - `deleteRule(ruleId: number): string(JSON)`
 - `setRuleEnabled(ruleId: number, enabled: boolean): string(JSON)`
+- `exportRules(inputJson: string): string(JSON)`
+- `importRules(inputJson: string): string(JSON)`
 - `isNotificationListenerEnabled(): boolean`
 - `openNotificationListenerSettings(): void`
 
@@ -50,6 +52,25 @@ WebView에서 `window.NotiFlowNative` 객체를 사용할 수 있습니다.
 - `webhook.token`에 새 값을 넣으면 교체
 - `webhook.token`을 `""`로 보내면 삭제
 - `webhook.headers`는 JSON object 형식 (`{ "X-App": "NotiFlow" }`)
+
+`exportRules` 입력 예시:
+```json
+{
+  "ruleIds": [1, 2],
+  "includeSecrets": false
+}
+```
+
+`exportRules`는 `{ "data": { "export": ... } }` 형태로 반환하며, `data.export`에는 다음 필드가 포함됩니다.
+- `schemaVersion`: 내보내기 JSON 스키마 버전
+- `app`: 내보내기를 생성한 앱 정보
+- `exportedAt`: epoch milliseconds 내보내기 시각
+- `includeSecrets`: 토큰 포함 여부
+- `rules`: 내보낸 룰 목록
+
+`includeSecrets=true`로 내보내면 webhook token이 plaintext `webhook.token` 값으로 포함됩니다. 공유 파일에는 토큰이 평문으로 들어가므로 필요한 경우에만 사용하세요.
+
+`importRules`는 bridge 응답 envelope 전체가 아니라(not the full bridge response envelope), `exportRules` 응답의 `data.export`에 해당하는 exported JSON object/file content를 JSON 문자열로 받습니다. 가져오기는 기존 룰을 유지(keeps existing rules)하면서 새 룰을 추가(adds new rules)하고, 내보낸 파일의 룰 id는 무시(ignores file ids)합니다.
 
 ## React 개발
 `web/` 폴더에 Vite + React 샘플이 포함되어 있습니다.

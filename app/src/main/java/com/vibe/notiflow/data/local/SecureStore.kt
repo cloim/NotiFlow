@@ -16,4 +16,5 @@ class SecureStore(context: Context) {
 
     fun putSecret(alias: String, secret: String) { prefs.edit().putString(alias, secret).apply() }
     fun getSecret(alias: String): String? = prefs.getString(alias, null)
+    fun removeSecret(alias: String) { prefs.edit().remove(alias).apply() }
 }

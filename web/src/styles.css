@@ -392,6 +392,99 @@ body {
 .rule-btn.del:active    { color: var(--red); }
 .rule-btn svg { width: 15px; height: 15px; }
 
+.rule-transfer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--accent-dim), rgba(148,163,184,.05) 56%), var(--card);
+  border: 1px solid rgba(99,102,241,.18);
+  border-radius: var(--r);
+}
+.rule-transfer-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--t1);
+}
+.rule-transfer-desc {
+  margin-top: 3px;
+  color: var(--t2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.rule-transfer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rule-transfer-actions .btn {
+  padding: 10px 12px;
+  font-size: 13.5px;
+}
+
+.rule-export-sheet .sheet-body {
+  gap: 12px;
+}
+.rule-export-count {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--t3);
+}
+.rule-export-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rule-export-secret,
+.rule-export-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--card);
+}
+.rule-export-secret {
+  padding: 12px;
+  border-color: rgba(245,158,11,.28);
+  background: color-mix(in srgb, var(--amber-dim) 28%, var(--card));
+}
+.rule-export-secret input,
+.rule-export-item input {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+.rule-export-secret span,
+.rule-export-item span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rule-export-secret strong,
+.rule-export-item strong {
+  color: var(--t1);
+  font-size: 14px;
+  font-weight: 800;
+}
+.rule-export-secret small,
+.rule-export-item small {
+  color: var(--t2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.rule-export-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rule-export-item {
+  padding: 12px;
+}
+
 /* ── Chip / Badge ───────────────────────────────────────────────────── */
 .chip {
   display: inline-flex; align-items: center; gap: 4px;

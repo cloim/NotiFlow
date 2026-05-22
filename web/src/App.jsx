@@ -81,6 +81,29 @@ function emptyForm() {
   };
 }
 
+function downloadJsonFile(payload) {
+  const text = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const fileName = `notiflow-rules-${timestamp}.json`;
+  const native = getBridge();
+
+  if (native?.saveJsonFile) {
+    const r = parseBridge(native.saveJsonFile(fileName, text));
+    if (!r?.ok) throw new Error(r?.error ?? "JSON 저장을 시작하지 못했습니다.");
+    return;
+  }
+
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function normalizeInstalledApps(items) {
   if (!Array.isArray(items)) return [];
   return items
@@ -911,6 +934,84 @@ function AppPickerDialog({
   );
 }
 
+function RuleExportSheet({
+  open,
+  rules,
+  selectedExportRuleIds,
+  includeExportSecrets,
+  busy,
+  onClose,
+  onToggleRule,
+  onSelectAll,
+  onClearAll,
+  onIncludeSecretsChange,
+  onExport,
+}) {
+  const selectedCount = selectedExportRuleIds.size;
+  return (
+    <>
+      <div className={`backdrop${open ? " open" : ""}`} onClick={onClose} />
+      <div className={`sheet rule-export-sheet${open ? " open" : ""}`}>
+        <div className="sheet-grab" />
+        <div className="sheet-hdr">
+          <div>
+            <span className="sheet-title">룰 내보내기</span>
+            <div className="rule-export-count">{selectedCount}개 선택됨</div>
+          </div>
+          <button className="icon-btn" onClick={onClose} disabled={busy}><Icon.X /></button>
+        </div>
+
+        <div className="sheet-body">
+          <div className="rule-export-actions">
+            <button className="btn btn-ghost" onClick={onSelectAll} disabled={busy || rules.length === 0}>전체 선택</button>
+            <button className="btn btn-ghost" onClick={onClearAll} disabled={busy || selectedCount === 0}>전체 해제</button>
+          </div>
+
+          <label className="rule-export-secret">
+            <input
+              type="checkbox"
+              checked={includeExportSecrets}
+              onChange={(e) => onIncludeSecretsChange(e.target.checked)}
+              disabled={busy}
+            />
+            <span>
+              <strong>토큰 포함</strong>
+              <small>내보낸 JSON에 webhook 토큰이 평문으로 포함됩니다. 안전한 위치에만 보관하세요.</small>
+            </span>
+          </label>
+
+          <div className="rule-export-list">
+            {rules.map((rule) => {
+              const checked = selectedExportRuleIds.has(rule.id);
+              return (
+                <label key={rule.id} className="rule-export-item">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggleRule(rule.id)}
+                    disabled={busy}
+                  />
+                  <span>
+                    <strong>{rule.name || `규칙 #${rule.id}`}</strong>
+                    <small>{rule.targetPackages?.[0] ?? "대상 앱 없음"}</small>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="sheet-foot">
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>취소</button>
+          <button className="btn btn-primary" onClick={onExport} disabled={busy || selectedCount === 0}>
+            {busy ? "내보내는 중..." : "선택한 룰 내보내기"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ── Log Item ───────────────────────────────────────────────────────── */
 function LogItem({ log }) {
   const cls = logClass(log.result);
@@ -958,9 +1059,14 @@ export default function App() {
   const [pcServerInfo, setPcServerInfo] = useState({ running: false, url: "" });
   const [pcServerTokenDraft, setPcServerTokenDraft] = useState("");
   const [pcServerBusy, setPcServerBusy] = useState(false);
+  const [isExportSheetOpen, setIsExportSheetOpen] = useState(false);
+  const [selectedExportRuleIds, setSelectedExportRuleIds] = useState(() => new Set());
+  const [includeExportSecrets, setIncludeExportSecrets] = useState(false);
+  const [ruleTransferBusy, setRuleTransferBusy] = useState(false);
   const toastTimer = useRef(null);
   const installedAppsRequestIdRef = useRef(0);
   const includeSystemAppsRef = useRef(includeSystemApps);
+  const importFileInputRef = useRef(null);
 
   const showToast = useCallback((msg, type = "ok") => {
     clearTimeout(toastTimer.current);
@@ -1274,6 +1380,79 @@ export default function App() {
   }, []);
   const closeSheet = useCallback(() => setSheet(false), []);
 
+  const openRuleExport = useCallback(() => {
+    if (!native?.exportRules) {
+      showToast("브라우저 모드에서는 앱 연결 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+    setSelectedExportRuleIds(new Set(rules.map((rule) => rule.id)));
+    setIncludeExportSecrets(false);
+    setIsExportSheetOpen(true);
+  }, [native, rules, showToast]);
+
+  const toggleExportRule = useCallback((ruleId) => {
+    setSelectedExportRuleIds((current) => {
+      const next = new Set(current);
+      if (next.has(ruleId)) next.delete(ruleId);
+      else next.add(ruleId);
+      return next;
+    });
+  }, []);
+
+  const exportSelectedRules = useCallback(() => {
+    if (!native?.exportRules) {
+      showToast("브라우저 모드에서는 앱 연결 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+    const ruleIds = Array.from(selectedExportRuleIds);
+    if (ruleIds.length === 0) return;
+
+    setRuleTransferBusy(true);
+    try {
+      const r = parseBridge(native.exportRules(JSON.stringify({ ruleIds, includeSecrets: includeExportSecrets })));
+      if (!r?.ok) { showToast(r?.error ?? "룰을 내보내지 못했습니다.", "err"); return; }
+      downloadJsonFile(r.data?.export ?? {});
+      setIsExportSheetOpen(false);
+      showToast(`${ruleIds.length}개 룰을 내보냈습니다.`);
+    } catch (error) {
+      showToast(error?.message ?? "룰을 내보내지 못했습니다.", "err");
+    } finally {
+      setRuleTransferBusy(false);
+    }
+  }, [native, selectedExportRuleIds, includeExportSecrets, showToast]);
+
+  const openRuleImport = useCallback(() => {
+    if (!native?.importRules) {
+      showToast("브라우저 모드에서는 앱 연결 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+    importFileInputRef.current?.click();
+  }, [native, showToast]);
+
+  const importRulesFromFile = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!native?.importRules) {
+      showToast("브라우저 모드에서는 앱 연결 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+
+    setRuleTransferBusy(true);
+    try {
+      const text = await file.text();
+      const r = parseBridge(native.importRules(text));
+      if (!r?.ok) { showToast(r?.error ?? "룰을 가져오지 못했습니다.", "err"); return; }
+      const imported = Number(r.data?.imported ?? 0);
+      showToast(`${imported}개 룰을 가져왔습니다.`);
+      loadRules();
+    } catch (error) {
+      showToast(error?.message ?? "룰을 가져오지 못했습니다.", "err");
+    } finally {
+      setRuleTransferBusy(false);
+    }
+  }, [native, showToast, loadRules]);
+
   const openPackagePicker = useCallback(async () => {
     if (!isNative) {
       showToast("브라우저 모드에서는 앱 연결 기능을 사용할 수 없습니다.", "err");
@@ -1460,7 +1639,9 @@ export default function App() {
     : tab === "logs"
       ? loadLogs
       : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadPerm(); void checkForUpdate(true); };
-  const topbarBusy = tab === "rules" || tab === "logs" ? busy : updateBusy;
+  const topbarBusy = tab === "rules" || tab === "logs" ? busy || ruleTransferBusy : updateBusy;
+  const canExportRules = Boolean(native?.exportRules);
+  const canImportRules = Boolean(native?.importRules);
 
   /* ── Render ── */
   return (
@@ -1485,6 +1666,36 @@ export default function App() {
       {/* ── Rules Tab ─────────────────────────────────────────────── */}
       {tab === "rules" && (
         <div className="tab-content">
+          <div className="rule-transfer-card">
+            <div>
+              <div className="rule-transfer-title">룰 백업</div>
+              <div className="rule-transfer-desc">현재 룰을 JSON으로 저장하거나 이전에 저장한 룰을 가져옵니다.</div>
+            </div>
+            <div className="rule-transfer-actions">
+              <button
+                className="btn btn-ghost"
+                onClick={openRuleImport}
+                disabled={!canImportRules || ruleTransferBusy}
+              >
+                룰 가져오기
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={openRuleExport}
+                disabled={!canExportRules || ruleTransferBusy || rules.length === 0}
+              >
+                룰 내보내기
+              </button>
+            </div>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".json,application/json"
+              hidden
+              onChange={importRulesFromFile}
+            />
+          </div>
+
           {rules.length === 0 ? (
             <div className="card">
               <div className="empty">
@@ -1807,6 +2018,20 @@ export default function App() {
         diff={diff}
         selectedAppLabel={selectedAppLabel}
         onOpenPackagePicker={openPackagePicker}
+      />
+
+      <RuleExportSheet
+        open={isExportSheetOpen}
+        rules={rules}
+        selectedExportRuleIds={selectedExportRuleIds}
+        includeExportSecrets={includeExportSecrets}
+        busy={ruleTransferBusy}
+        onClose={() => setIsExportSheetOpen(false)}
+        onToggleRule={toggleExportRule}
+        onSelectAll={() => setSelectedExportRuleIds(new Set(rules.map((rule) => rule.id)))}
+        onClearAll={() => setSelectedExportRuleIds(new Set())}
+        onIncludeSecretsChange={setIncludeExportSecrets}
+        onExport={exportSelectedRules}
       />
 
       <PackageLoadingDialog open={isPackageLoadingDialogOpen} />
