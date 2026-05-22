@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +19,7 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
 import com.cloimism.notiflow.BuildConfig
 import com.vibe.notiflow.di.ServiceLocator
 import com.vibe.notiflow.domain.engine.ConditionExpressionEvaluator
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setSystemBarsTheme(isLight = false)
 
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
@@ -124,6 +127,17 @@ class MainActivity : ComponentActivity() {
         }
 
         webView.loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun setSystemBarsTheme(isLight: Boolean) {
+        val background = if (isLight) Color.rgb(246, 248, 251) else Color.rgb(7, 9, 15)
+        window.statusBarColor = background
+        window.navigationBarColor = background
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = isLight
+            isAppearanceLightNavigationBars = isLight
+        }
     }
 
     private fun isNotificationListenerEnabled(): Boolean {
@@ -516,6 +530,13 @@ class MainActivity : ComponentActivity() {
                 put("packageName", packageName)
                 put("platform", "android")
             }.toString()
+        }
+
+        @JavascriptInterface
+        fun setSystemBarsTheme(isLight: Boolean) {
+            runOnUiThread {
+                this@MainActivity.setSystemBarsTheme(isLight)
+            }
         }
 
         @JavascriptInterface
