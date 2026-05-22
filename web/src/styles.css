@@ -1086,6 +1086,17 @@ input[type="datetime-local"].field-input {
   font-size: 13px;
   line-height: 1.5;
 }
+.pc-server-token {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pc-server-token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
 .pc-server-url {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

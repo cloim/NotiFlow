@@ -17,7 +17,9 @@ for (const text of [
   "startPcSettingsServer",
   "stopPcSettingsServer",
   "getPcSettingsServerStatus",
+  "setPcSettingsServerToken",
   "pcSettingsServerHandler",
+  "PREF_PC_SETTINGS_TOKEN",
 ]) {
   if (!mainActivity.includes(text)) failures.push(`MainActivity must include ${text}`);
 }
@@ -37,15 +39,18 @@ for (const text of [
 for (const text of [
   "PC 설정 서버",
   "pcServerInfo",
+  "pcServerTokenDraft",
+  "savePcSettingsServerToken",
   "startPcSettingsServer",
   "stopPcSettingsServer",
+  "접속 토큰",
   "pc-server-card",
 ]) {
   if (!app.includes(text)) failures.push(`App must include ${text}`);
 }
 
-if (!css.includes(".pc-server-card") || !css.includes(".pc-server-url")) {
-  failures.push("styles.css must style the PC settings server card and URL");
+if (!css.includes(".pc-server-card") || !css.includes(".pc-server-url") || !css.includes(".pc-server-token-row")) {
+  failures.push("styles.css must style the PC settings server card, token input, and URL");
 }
 if (pkg.scripts["test:pc-settings-server"] !== "node scripts/verify-pc-settings-server.mjs") {
   failures.push("package.json must expose test:pc-settings-server");

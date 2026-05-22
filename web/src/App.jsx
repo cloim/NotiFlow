@@ -956,6 +956,7 @@ export default function App() {
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [themePreference, setThemePreference] = useState(getInitialThemePreference);
   const [pcServerInfo, setPcServerInfo] = useState({ running: false, url: "" });
+  const [pcServerTokenDraft, setPcServerTokenDraft] = useState("");
   const [pcServerBusy, setPcServerBusy] = useState(false);
   const toastTimer = useRef(null);
   const installedAppsRequestIdRef = useRef(0);
@@ -1018,16 +1019,22 @@ export default function App() {
   const loadPcSettingsServerStatus = useCallback(() => {
     if (!native?.getPcSettingsServerStatus) return;
     const r = parseBridge(native.getPcSettingsServerStatus());
-    if (r?.ok) setPcServerInfo(r.data ?? { running: false, url: "" });
+    if (r?.ok) {
+      const nextInfo = r.data ?? { running: false, url: "" };
+      setPcServerInfo(nextInfo);
+      setPcServerTokenDraft(nextInfo.configuredToken || nextInfo.token || "");
+    }
   }, [native]);
 
   const startPcSettingsServer = useCallback(() => {
     if (!native?.startPcSettingsServer) return;
     setPcServerBusy(true);
     try {
-      const r = parseBridge(native.startPcSettingsServer());
+      const r = parseBridge(native.startPcSettingsServer(pcServerTokenDraft.trim()));
       if (r?.ok) {
-        setPcServerInfo(r.data ?? { running: false, url: "" });
+        const nextInfo = r.data ?? { running: false, url: "" };
+        setPcServerInfo(nextInfo);
+        setPcServerTokenDraft(nextInfo.configuredToken || nextInfo.token || "");
         showToast("PC 설정 서버를 시작했습니다.");
       } else {
         showToast(r?.error ?? "PC 설정 서버를 시작하지 못했습니다.", "err");
@@ -1035,7 +1042,7 @@ export default function App() {
     } finally {
       setPcServerBusy(false);
     }
-  }, [native, showToast]);
+  }, [native, pcServerTokenDraft, showToast]);
 
   const stopPcSettingsServer = useCallback(() => {
     if (!native?.stopPcSettingsServer) return;
@@ -1043,7 +1050,9 @@ export default function App() {
     try {
       const r = parseBridge(native.stopPcSettingsServer());
       if (r?.ok) {
-        setPcServerInfo(r.data ?? { running: false, url: "" });
+        const nextInfo = r.data ?? { running: false, url: "" };
+        setPcServerInfo(nextInfo);
+        setPcServerTokenDraft(nextInfo.configuredToken || nextInfo.token || "");
         showToast("PC 설정 서버를 중지했습니다.");
       } else {
         showToast(r?.error ?? "PC 설정 서버를 중지하지 못했습니다.", "err");
@@ -1052,6 +1061,24 @@ export default function App() {
       setPcServerBusy(false);
     }
   }, [native, showToast]);
+
+  const savePcSettingsServerToken = useCallback(() => {
+    if (!native?.setPcSettingsServerToken) return;
+    setPcServerBusy(true);
+    try {
+      const r = parseBridge(native.setPcSettingsServerToken(pcServerTokenDraft.trim()));
+      if (r?.ok) {
+        const nextInfo = r.data ?? { running: false, url: "" };
+        setPcServerInfo(nextInfo);
+        setPcServerTokenDraft(nextInfo.configuredToken || nextInfo.token || "");
+        showToast("PC 설정 서버 토큰을 저장했습니다.");
+      } else {
+        showToast(r?.error ?? "PC 설정 서버 토큰을 저장하지 못했습니다.", "err");
+      }
+    } finally {
+      setPcServerBusy(false);
+    }
+  }, [native, pcServerTokenDraft, showToast]);
 
   const checkForUpdate = useCallback(async (manual = false) => {
     if (!native?.checkForUpdate) {
@@ -1606,6 +1633,28 @@ export default function App() {
                 </div>
                 <div className="pc-server-desc">
                   같은 Wi-Fi의 PC 브라우저에서 규칙과 앱 정보를 설정할 수 있습니다.
+                </div>
+              </div>
+              <div className="pc-server-token">
+                <label className="field-lbl" htmlFor="pc-server-token">접속 토큰</label>
+                <div className="pc-server-token-row">
+                  <input
+                    id="pc-server-token"
+                    className="field-input"
+                    value={pcServerTokenDraft}
+                    onChange={(e) => setPcServerTokenDraft(e.target.value)}
+                    placeholder="영문/숫자/._~- 6~64자"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                  />
+                  <button
+                    className="btn btn-ghost"
+                    onClick={savePcSettingsServerToken}
+                    disabled={!isNative || pcServerBusy || !pcServerTokenDraft.trim()}
+                  >
+                    저장
+                  </button>
                 </div>
               </div>
               {pcServerInfo?.running && (
