@@ -33,6 +33,7 @@ class RuleRepository(private val ruleDao: RuleDao, private val logDao: LogDao) {
             .filter { it.targetPackages.isEmpty() || it.targetPackages.contains(packageName) }
 
     suspend fun upsertRule(rule: Rule): Long = ruleDao.upsert(rule.toEntity())
+    suspend fun upsertRules(rules: List<Rule>): List<Long> = ruleDao.upsertAll(rules.map { it.toEntity() })
     suspend fun updateEnabled(id: Long, enabled: Boolean) = ruleDao.updateEnabled(id, enabled)
     suspend fun deleteRule(id: Long) = ruleDao.deleteById(id)
     suspend fun insertLog(log: ExecutionLog) = logDao.insert(log.toEntity())

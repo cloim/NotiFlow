@@ -82,6 +82,8 @@ MainActivity (WebView Shell)
 | `updateRule(inputJson)` | `{ data: { ruleId } }` |
 | `deleteRule(ruleId)` | `{ data: { ruleId } }` |
 | `setRuleEnabled(ruleId, enabled)` | `{ data: { ruleId, enabled } }` |
+| `exportRules(inputJson)` | `{ data: { export } }` |
+| `importRules(inputJson)` | `{ data: { imported, ruleIds } }` |
 | `isNotificationListenerEnabled()` | `boolean` |
 | `openNotificationListenerSettings()` | `void` |
 
