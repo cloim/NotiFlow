@@ -157,13 +157,13 @@ body {
 /* ── Top Bar ────────────────────────────────────────────────────────── */
 .app-topbar {
   position: fixed;
-  top: 0;
+  top: var(--safe-t);
   left: 0;
   right: 0;
   max-width: 480px;
-  height: calc(var(--safe-t) + var(--topbar-h));
+  height: var(--topbar-h);
   margin: 0 auto;
-  padding: calc(var(--safe-t) + 10px) 16px 10px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
