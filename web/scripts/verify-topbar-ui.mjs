@@ -25,6 +25,13 @@ if (!css.includes("--topbar-h")) {
 if (!/\.app-topbar\s*\{[\s\S]*?position:\s*fixed/.test(css)) {
   failures.push(".app-topbar must be fixed at the top");
 }
+const appTopbar = css.match(/\.app-topbar\s*\{(?<body>[\s\S]*?)\}/)?.groups?.body ?? "";
+if (!appTopbar.includes("top: var(--safe-t)")) {
+  failures.push(".app-topbar must be offset below the system status bar safe area");
+}
+if (!appTopbar.includes("height: var(--topbar-h)")) {
+  failures.push(".app-topbar height must stay independent from the system status bar safe area");
+}
 const tabContent = css.match(/\.tab-content\s*\{(?<body>[\s\S]*?)\}/)?.groups?.body ?? "";
 if (!tabContent.includes("var(--topbar-h)")) {
   failures.push(".tab-content top padding must account for --topbar-h");
