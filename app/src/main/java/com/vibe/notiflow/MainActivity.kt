@@ -32,14 +32,14 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.ClearCredentialException
-import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.WindowCompat
 import androidx.webkit.WebViewAssetLoader
 import com.cloimism.notiflow.BuildConfig
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.auth.FirebaseAuth
@@ -765,10 +765,8 @@ class MainActivity : ComponentActivity() {
         return getString(resId)
     }
 
-    private suspend fun getGoogleCredential(filterByAuthorizedAccounts: Boolean): Credential {
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(filterByAuthorizedAccounts)
-            .setServerClientId(defaultWebClientId())
+    private suspend fun getGoogleCredential(): Credential {
+        val googleIdOption = GetSignInWithGoogleOption.Builder(defaultWebClientId())
             .build()
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
@@ -791,15 +789,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             lastAuthError = null
             runCatching {
-                val credential = runCatching {
-                    getGoogleCredential(filterByAuthorizedAccounts = true)
-                }.recoverCatching { error ->
-                    if (error is GetCredentialException) {
-                        getGoogleCredential(filterByAuthorizedAccounts = false)
-                    } else {
-                        throw error
-                    }
-                }.getOrThrow()
+                val credential = getGoogleCredential()
 
                 signInWithGoogleCredential(credential)
                 runCatching {
@@ -809,7 +799,11 @@ class MainActivity : ComponentActivity() {
                     Log.w("NotiFlow", "Push token registration failed", error)
                 }
             }.onFailure { error ->
-                lastAuthError = error.message ?: "Google 로그인에 실패했습니다."
+                lastAuthError = if (error is NoCredentialException) {
+                    "Google 계정을 선택할 수 없습니다. 기기에 Google 계정을 추가하고 Google Play 서비스를 업데이트한 뒤 다시 시도하세요."
+                } else {
+                    error.message ?: "Google 로그인에 실패했습니다."
+                }
                 Log.w("NotiFlow", "Google sign-in failed", error)
             }
             notifyAuthStateChanged()
