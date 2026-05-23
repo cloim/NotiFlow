@@ -13,9 +13,11 @@ const pkg = JSON.parse(read("web/package.json"));
 
 const fcmServicePath = "app/src/main/java/com/vibe/notiflow/notification/NotiFlowFirebaseMessagingService.kt";
 const notifierPath = "app/src/main/java/com/vibe/notiflow/notification/NotiFlowPushNotifier.kt";
+const listenerPath = "app/src/main/java/com/vibe/notiflow/notification/NotiFlowNotificationListenerService.kt";
 
 const fcmService = fs.existsSync(path.join(root, fcmServicePath)) ? read(fcmServicePath) : "";
 const notifier = fs.existsSync(path.join(root, notifierPath)) ? read(notifierPath) : "";
+const listener = fs.existsSync(path.join(root, listenerPath)) ? read(listenerPath) : "";
 
 const failures = [];
 
@@ -57,6 +59,12 @@ if (fcmService.includes("RuleEngine") || fcmService.includes("ruleEngine") || fc
 }
 for (const text of ["NotificationManagerCompat", "NotificationChannel", "notiflow_push", "POST_NOTIFICATIONS"]) {
   if (!notifier.includes(text)) failures.push(`NotiFlowPushNotifier must include ${text}`);
+}
+if (!notifier.includes(".setAutoCancel(false)")) {
+  failures.push("NotiFlow push notifications must remain visible after the user opens NotiFlow from them");
+}
+for (const text of ["cancelNotification", "cancelAllNotifications", "contentIntent.send", "deleteIntent.send"]) {
+  if (listener.includes(text)) failures.push(`Notification listener must not dismiss or activate source notifications via ${text}`);
 }
 if (pkg.scripts["test:fcm-notifications"] !== "node scripts/verify-fcm-notification-receiver.mjs") {
   failures.push("package.json must expose test:fcm-notifications");

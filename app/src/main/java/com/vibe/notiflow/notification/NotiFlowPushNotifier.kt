@@ -48,7 +48,7 @@ class NotiFlowPushNotifier(private val context: Context) {
             .setContentText(resolvedBody)
             .setStyle(NotificationCompat.BigTextStyle().bigText(resolvedBody))
             .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
+            .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
