@@ -39,10 +39,14 @@ for (const text of [
 
 for (const text of [
   "authState",
+  "authReady",
   "loadAuthState",
   "signInWithGoogle",
   "signOutGoogle",
   "notiflowAuthChanged",
+  "login-gate",
+  "login-gate-card",
+  "loginRequired",
   "Google로 로그인",
   "로그아웃",
   "계정",
@@ -50,8 +54,23 @@ for (const text of [
   if (!app.includes(text)) failures.push(`App UI must include ${text}`);
 }
 
-for (const text of ["account-card", "account-title", "account-email", "account-actions"]) {
+for (const text of [
+  "account-card",
+  "account-title",
+  "account-email",
+  "account-actions",
+  "login-gate",
+  "login-gate-card",
+  "login-gate-title",
+]) {
   if (!styles.includes(text)) failures.push(`styles.css must include ${text}`);
+}
+
+if (!/const\s+loginRequired\s*=\s*authReady\s*&&\s*isNative\s*&&\s*!\s*authState\?\.\s*signedIn/.test(app)) {
+  failures.push("App must require sign-in before native app usage");
+}
+if (!/if\s*\(\s*loginRequired\s*\)/.test(app)) {
+  failures.push("App must render the login gate before the main UI");
 }
 
 if (!docs.includes("Google Authentication") || !docs.includes("debug SHA-1")) {

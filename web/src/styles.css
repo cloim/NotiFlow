@@ -1274,6 +1274,63 @@ input[type="datetime-local"].field-input {
   display: flex;
 }
 
+.app-locked {
+  display: flex;
+  align-items: stretch;
+}
+.login-gate {
+  width: 100%;
+  min-height: 100dvh;
+  padding: calc(var(--safe-t) + 24px) 20px calc(var(--safe-b) + 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+.login-gate-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r);
+}
+.login-gate-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #4285f4;
+  font-size: 21px;
+  font-weight: 900;
+  border: 1px solid var(--border-hi);
+}
+.login-gate-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--t1);
+}
+.login-gate-desc {
+  margin-top: 4px;
+  color: var(--t2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.login-gate-error {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--red-dim);
+  border: 1px solid rgba(244,63,94,.25);
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .perm-card {
   display: flex; align-items: center; gap: 14px;
   padding: 16px;

@@ -46,6 +46,12 @@ if (!mainActivity.includes("isAppearanceLightStatusBars = isLight")) {
 if (!mainActivity.includes("window.statusBarColor")) {
   failures.push("MainActivity must set a status bar background that matches the resolved theme");
 }
+if (!mainActivity.includes("WindowCompat.setDecorFitsSystemWindows(window, true)")) {
+  failures.push("MainActivity must keep WebView content out of the transparent system status bar area");
+}
+if (!mainActivity.includes("window.navigationBarColor = background")) {
+  failures.push("MainActivity must set a navigation bar background that matches the resolved theme");
+}
 if (!app.includes("browser-mode-card")) {
   failures.push("Browser mode notice must use a dedicated theme-aware class");
 }

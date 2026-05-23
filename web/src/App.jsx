@@ -1060,6 +1060,7 @@ export default function App() {
   const [pcServerTokenDraft, setPcServerTokenDraft] = useState("");
   const [pcServerBusy, setPcServerBusy] = useState(false);
   const [authState, setAuthState] = useState({ signedIn: false });
+  const [authReady, setAuthReady] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [isExportSheetOpen, setIsExportSheetOpen] = useState(false);
   const [selectedExportRuleIds, setSelectedExportRuleIds] = useState(() => new Set());
@@ -1137,12 +1138,20 @@ export default function App() {
   const loadAuthState = useCallback((nextState = null) => {
     if (nextState) {
       setAuthState(nextState);
+      setAuthReady(true);
       return;
     }
-    if (!native?.getAuthState) return;
+    if (!native?.getAuthState) {
+      setAuthReady(true);
+      return;
+    }
     const r = parseBridge(native.getAuthState());
-    if (r?.ok) setAuthState(r.data ?? { signedIn: false });
-    else showToast(r?.error ?? "로그인 상태를 확인하지 못했습니다.", "err");
+    if (r?.ok) {
+      setAuthState(r.data ?? { signedIn: false });
+    } else {
+      showToast(r?.error ?? "로그인 상태를 확인하지 못했습니다.", "err");
+    }
+    setAuthReady(true);
   }, [native, showToast]);
 
   const signInWithGoogle = useCallback(() => {
@@ -1297,10 +1306,14 @@ export default function App() {
 
   useEffect(() => {
     loadAppInfo();
-    loadPcSettingsServerStatus();
     loadAuthState();
+  }, [loadAppInfo, loadAuthState]);
+
+  useEffect(() => {
+    if (isNative && (!authReady || !authState?.signedIn)) return;
+    loadPcSettingsServerStatus();
     refresh();
-  }, [loadAppInfo, loadPcSettingsServerStatus, loadAuthState, refresh]);
+  }, [isNative, authReady, authState?.signedIn, loadPcSettingsServerStatus, refresh]);
 
   useEffect(() => {
     const onAuthChanged = (event) => {
@@ -1313,12 +1326,12 @@ export default function App() {
   }, [loadAuthState]);
 
   useEffect(() => {
-    if (!isNative) return undefined;
+    if (!isNative || !authState?.signedIn) return undefined;
     const timer = setTimeout(() => {
       void checkForUpdate(false);
     }, 700);
     return () => clearTimeout(timer);
-  }, [isNative, checkForUpdate]);
+  }, [isNative, authState?.signedIn, checkForUpdate]);
 
   // Form helpers
   const setField = useCallback((k, v) => setFormState(f => ({ ...f, [k]: v })), []);
@@ -1689,8 +1702,38 @@ export default function App() {
   const topbarBusy = tab === "rules" || tab === "logs" ? busy || ruleTransferBusy : updateBusy;
   const canExportRules = Boolean(native?.exportRules);
   const canImportRules = Boolean(native?.importRules);
+  const loginRequired = authReady && isNative && !authState?.signedIn;
 
   /* ── Render ── */
+  if (loginRequired) {
+    return (
+      <div className="app app-locked">
+        <Toast toast={toast} />
+        <main className="login-gate">
+          <section className="login-gate-card">
+            <div className="login-gate-mark">G</div>
+            <div>
+              <div className="login-gate-title">Google 로그인이 필요합니다</div>
+              <div className="login-gate-desc">
+                NotiFlow를 사용하려면 먼저 Google 계정으로 로그인하세요.
+              </div>
+            </div>
+            {authState?.authError && (
+              <div className="login-gate-error">{authState.authError}</div>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={signInWithGoogle}
+              disabled={authBusy}
+            >
+              {authBusy ? "로그인 중..." : "Google로 로그인"}
+            </button>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <Toast toast={toast} />
