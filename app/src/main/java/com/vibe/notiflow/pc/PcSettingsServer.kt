@@ -358,6 +358,51 @@ class PcSettingsServer(
     .status { margin-top:5px; color:var(--muted); font-size:13px; }
     .pill { display:inline-flex; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:color-mix(in srgb,var(--accent) 15%,transparent); color:var(--accent); }
     .pill.off { background:color-mix(in srgb,var(--muted) 18%,transparent); color:var(--muted); }
+    .field { display:grid; gap:6px; }
+    .field-lbl { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; }
+    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .pkg-picker-btn { width:100%; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; min-height:58px; text-align:left; color:var(--text); background:var(--bg); border:1px solid var(--line); }
+    .pkg-picker-label { font-size:14px; font-weight:800; }
+    .pkg-picker-package { color:var(--muted); font-size:12px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+    .placeholder { color:var(--muted); }
+    .conds-box { display:grid; gap:10px; }
+    .cond-help { color:var(--muted); font-size:12px; line-height:1.45; }
+    .add-group-btn { justify-self:start; }
+    .group-card { display:grid; gap:10px; border:1px solid var(--line); border-radius:8px; padding:10px; background:color-mix(in srgb,var(--muted) 7%,transparent); }
+    .group-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .group-title { font-weight:800; }
+    .group-del { color:var(--bad); background:color-mix(in srgb,var(--bad) 13%,transparent); }
+    .group-conds { display:grid; gap:8px; }
+    .cond-item { border:1px solid var(--line); border-radius:8px; padding:8px; background:var(--card); }
+    .cond-row { display:grid; grid-template-columns:150px minmax(0,1fr) 34px 34px; gap:8px; align-items:center; }
+    .cond-add, .cond-del { width:34px; height:34px; padding:0; display:grid; place-items:center; }
+    .cond-del { color:var(--bad); background:color-mix(in srgb,var(--bad) 13%,transparent); }
+    .group-op-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .group-op-row.between { padding-top:4px; border-top:1px dashed var(--line); }
+    .cond-link-lbl { color:var(--muted); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; }
+    .seg { display:flex; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:var(--bg); }
+    .seg-opt { min-width:58px; color:var(--muted); background:transparent; border-radius:0; }
+    .seg-opt.active { color:#fff; background:var(--accent); }
+    .expr-preview, .diff-box { border:1px dashed var(--line); border-radius:8px; padding:10px; background:var(--bg); }
+    .expr-preview-lbl, .diff-lbl { display:block; margin-bottom:6px; color:var(--muted); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; }
+    .expr-preview-code { color:var(--text); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .diff-line { color:var(--muted); font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
+    .token-check, .picker-toggle { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; font-weight:600; }
+    .token-check input, .picker-toggle input { width:16px; height:16px; accent-color:var(--accent); }
+    .picker-backdrop { position:fixed; inset:0; background:#0000008c; z-index:10; display:none; }
+    .picker-backdrop.open { display:block; }
+    .picker-dialog { position:fixed; left:50%; top:50%; width:min(560px,calc(100vw - 28px)); max-height:min(760px,calc(100vh - 32px)); transform:translate(-50%,-50%); z-index:11; display:none; flex-direction:column; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; box-shadow:0 18px 60px #00000066; }
+    .picker-dialog.open { display:flex; }
+    .picker-head, .picker-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); }
+    .picker-foot { border-top:1px solid var(--line); border-bottom:0; }
+    .picker-body { display:grid; gap:10px; min-height:0; padding:14px; }
+    .picker-list { min-height:240px; max-height:420px; overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--bg); }
+    .picker-item { width:100%; display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:11px 12px; color:var(--text); background:transparent; border-bottom:1px solid var(--line); border-radius:0; text-align:left; }
+    .picker-item:last-child { border-bottom:0; }
+    .picker-item-label { font-weight:800; }
+    .picker-item-package { color:var(--muted); font-size:12px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .picker-empty { padding:28px 12px; color:var(--muted); text-align:center; }
+    @media (max-width:640px) { .field-row, .cond-row { grid-template-columns:1fr; } .cond-add, .cond-del { width:100%; } }
     @media (max-width:860px) { .grid { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -380,48 +425,7 @@ class PcSettingsServer(
 
     <aside class="card">
       <h2 id="formTitle">새 규칙</h2>
-      <form class="form" onsubmit="saveRule(event)">
-        <input type="hidden" id="ruleId" />
-        <label>대상 앱
-          <input id="packageName" list="apps" placeholder="com.example.app" required />
-          <datalist id="apps"></datalist>
-        </label>
-        <label>규칙 이름
-          <input id="ruleName" placeholder="비워두면 자동 생성" />
-        </label>
-        <div class="cols">
-          <label>활성화
-            <select id="enabled"><option value="true">활성</option><option value="false">일시 정지</option></select>
-          </label>
-          <label>우선순위
-            <input id="priority" type="number" value="100" />
-          </label>
-        </div>
-        <label>조건 행 JSON
-          <textarea id="conditionRows" required></textarea>
-        </label>
-        <div class="cols">
-          <label>Webhook Method
-            <select id="webhookMethod"><option>POST</option><option>PUT</option><option>PATCH</option></select>
-          </label>
-          <label>Webhook URL
-            <input id="webhookUrl" placeholder="https://hooks.example.com/..." required />
-          </label>
-        </div>
-        <label>헤더
-          <textarea id="headersRaw" placeholder="X-App: NotiFlow"></textarea>
-        </label>
-        <label>페이로드 템플릿
-          <textarea id="payloadTemplate" placeholder='{"title":{{title}},"text":{{text}}}'></textarea>
-        </label>
-        <label>토큰
-          <input id="tokenValue" type="password" placeholder="수정 시 비워두면 기존 값 유지" />
-        </label>
-        <div class="actions">
-          <button type="submit">저장</button>
-          <button type="button" class="ghost" onclick="resetForm()">초기화</button>
-        </div>
-      </form>
+      <div id="ruleFormHost"></div>
     </aside>
 
     <section class="card">
@@ -435,6 +439,27 @@ class PcSettingsServer(
     </section>
   </main>
 
+  <div id="pickerBackdrop" class="picker-backdrop" onclick="closePackagePicker()"></div>
+  <div id="pickerDialog" class="picker-dialog" role="dialog" aria-modal="true">
+    <div class="picker-head">
+      <h2 style="margin:0">대상 앱 선택</h2>
+      <button class="ghost" onclick="closePackagePicker()">닫기</button>
+    </div>
+    <div class="picker-body">
+      <label class="picker-toggle">
+        <input id="includeSystemApps" type="checkbox" onchange="setIncludeSystemApps(this.checked)" />
+        시스템 앱 포함
+      </label>
+      <input id="picker-query" placeholder="앱 이름 또는 패키지 검색" oninput="setPickerQuery(this.value)" />
+      <div id="pickerCount" class="rule-meta"></div>
+      <div id="pickerList" class="picker-list"></div>
+    </div>
+    <div class="picker-foot">
+      <span class="rule-meta">설치된 앱 목록은 대상 앱 선택에만 사용됩니다.</span>
+      <button class="ghost" onclick="closePackagePicker()">취소</button>
+    </div>
+  </div>
+
   <script>
     const TOKEN = "__TOKEN__";
     const api = async (path, options) => {
@@ -447,6 +472,12 @@ class PcSettingsServer(
       return json.data || {};
     };
     let rules = [];
+    let installedApps = [];
+    let includeSystemApps = false;
+    let pickerQuery = "";
+    let form = emptyForm();
+    let baseline = null;
+    let nextId = 1;
 
     const webhookOf = (rule) => (rule.actions || []).find((action) => action.type === "webhook.post")?.config || {};
     const rowsOf = (rule) => rule.conditionExpression?.rows || (rule.conditions || []).map((condition, idx, arr) => ({
@@ -454,6 +485,36 @@ class PcSettingsServer(
       value: condition.value,
       operator: idx < arr.length - 1 ? (rule.conditionOperator || "AND") : null
     }));
+    const normLogicOp = (value, fallback) => {
+      const op = String(value || fallback || "AND").toUpperCase();
+      return op === "OR" ? "OR" : "AND";
+    };
+    const condId = () => "cond-" + nextId++;
+    const groupId = () => "group-" + nextId++;
+    const blankCond = () => ({ id: condId(), type: "text.contains", value: "" });
+    const blankGroup = (intraOp, nextGroupOp) => ({
+      id: groupId(),
+      intraOp: normLogicOp(intraOp, "AND"),
+      nextGroupOp: nextGroupOp == null ? null : normLogicOp(nextGroupOp, "AND"),
+      conditions: [blankCond()]
+    });
+    function emptyForm() {
+      return {
+        id: null,
+        name: "",
+        packageName: "",
+        groups: [blankGroup()],
+        webhookUrl: "",
+        webhookMethod: "POST",
+        headersRaw: "",
+        payloadTemplate: "",
+        token: "",
+        removeToken: false,
+        hasTokenRef: false,
+        enabled: true,
+        priority: 100
+      };
+    }
     const parseHeaders = (raw) => Object.fromEntries(String(raw || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
       const idx = line.indexOf(":");
       if (idx <= 0) throw new Error("헤더 형식이 올바르지 않습니다: " + line);
@@ -473,16 +534,15 @@ class PcSettingsServer(
       renderAppInfo(appInfo, permission);
       renderRules();
       renderLogs(logsData.logs || []);
-      loadApps();
+      loadApps(includeSystemApps);
       document.getElementById("status").textContent = "연결됨";
     }
 
-    async function loadApps() {
+    async function loadApps(nextIncludeSystem) {
       try {
-        const data = await api("/api/apps?includeSystem=false");
-        document.getElementById("apps").innerHTML = (data.apps || []).map((app) =>
-          '<option value="' + escapeHtml(app.packageName) + '">' + escapeHtml(app.appLabel) + '</option>'
-        ).join("");
+        const data = await api("/api/apps?includeSystem=" + String(Boolean(nextIncludeSystem)));
+        installedApps = data.apps || [];
+        renderPackagePicker();
       } catch (error) {
         console.warn(error);
       }
@@ -530,59 +590,380 @@ class PcSettingsServer(
     }
 
     function resetForm() {
-      document.getElementById("formTitle").textContent = "새 규칙";
-      document.getElementById("ruleId").value = "";
-      document.getElementById("packageName").value = "";
-      document.getElementById("ruleName").value = "";
-      document.getElementById("enabled").value = "true";
-      document.getElementById("priority").value = "100";
-      document.getElementById("conditionRows").value = JSON.stringify([{ type: "text.contains", value: "", operator: null }], null, 2);
-      document.getElementById("webhookMethod").value = "POST";
-      document.getElementById("webhookUrl").value = "";
-      document.getElementById("headersRaw").value = "";
-      document.getElementById("payloadTemplate").value = "";
-      document.getElementById("tokenValue").value = "";
+      form = emptyForm();
+      baseline = null;
+      renderRuleForm();
     }
 
     function editRule(id) {
       const rule = rules.find((item) => item.id === id);
       if (!rule) return;
       const webhook = webhookOf(rule);
-      document.getElementById("formTitle").textContent = "규칙 #" + id + " 수정";
-      document.getElementById("ruleId").value = id;
-      document.getElementById("packageName").value = (rule.targetPackages || [])[0] || "";
-      document.getElementById("ruleName").value = rule.name || "";
-      document.getElementById("enabled").value = String(Boolean(rule.enabled));
-      document.getElementById("priority").value = String(rule.priority || 100);
-      document.getElementById("conditionRows").value = JSON.stringify(rowsOf(rule), null, 2);
-      document.getElementById("webhookMethod").value = webhook.method || "POST";
-      document.getElementById("webhookUrl").value = webhook.url || "";
-      document.getElementById("headersRaw").value = headersText(webhook.headers);
-      document.getElementById("payloadTemplate").value = webhook.payloadTemplate || "";
-      document.getElementById("tokenValue").value = "";
+      form = {
+        id: Number(rule.id),
+        name: String(rule.name || ""),
+        packageName: String((rule.targetPackages || [])[0] || ""),
+        groups: toEditableGroups(rule),
+        webhookUrl: String(webhook.url || ""),
+        webhookMethod: String(webhook.method || "POST"),
+        headersRaw: headersText(webhook.headers),
+        payloadTemplate: String(webhook.payloadTemplate || ""),
+        token: "",
+        removeToken: false,
+        hasTokenRef: Boolean(webhook.hasTokenRef || webhook.tokenRef),
+        enabled: Boolean(rule.enabled),
+        priority: Number(rule.priority || 100)
+      };
+      baseline = ruleToNorm(rule);
+      renderRuleForm();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function renderRuleForm() {
+      const isEdit = form.id !== null;
+      document.getElementById("formTitle").textContent = isEdit ? "규칙 #" + form.id + " 수정" : "새 규칙";
+      const selectedApp = installedApps.find((app) => app.packageName === form.packageName);
+      const selectedAppLabel = selectedApp ? selectedApp.appLabel : "";
+      document.getElementById("ruleFormHost").innerHTML =
+        '<form class="form" onsubmit="saveRule(event)">' +
+          '<div class="field"><label class="field-lbl">대상 앱</label>' +
+            '<button type="button" class="pkg-picker-btn" onclick="openPackagePicker()">' +
+              '<span class="pkg-picker-label ' + (selectedAppLabel ? "" : "placeholder") + '">' + escapeHtml(selectedAppLabel || "설치된 앱 목록에서 선택") + '</span>' +
+              '<span class="pkg-picker-package ' + (form.packageName ? "" : "placeholder") + '">' + escapeHtml(form.packageName || "클릭해서 찾아보기") + '</span>' +
+            '</button></div>' +
+          '<div class="field"><label class="field-lbl">규칙 이름 <span class="placeholder">(선택)</span></label>' +
+            '<input placeholder="비워두면 자동 생성" value="' + escapeHtml(form.name) + '" oninput="setField(\'name\', this.value, false)" /></div>' +
+          '<div class="field"><label class="field-lbl">조건</label><div class="conds-box">' +
+            '<div class="cond-help">그룹을 추가한 뒤 각 그룹 안에 조건을 넣으세요. 괄호는 자동으로 생성됩니다.</div>' +
+            '<button type="button" class="add-group-btn" onclick="addGroup()">+ 그룹 추가</button>' +
+            renderGroups() +
+            '<div class="expr-preview"><span class="expr-preview-lbl">조건식</span><code id="exprPreview" class="expr-preview-code"></code></div>' +
+          '</div></div>' +
+          '<div class="field"><label class="field-lbl">Webhook URL</label>' +
+            '<input placeholder="https://hooks.example.com/..." value="' + escapeHtml(form.webhookUrl) + '" oninput="setField(\'webhookUrl\', this.value, false)" /></div>' +
+          '<div class="field-row">' +
+            '<div class="field"><label class="field-lbl">메서드</label><select onchange="setField(\'webhookMethod\', this.value, false)">' +
+              optionHtml("POST", form.webhookMethod) + optionHtml("PUT", form.webhookMethod) + optionHtml("PATCH", form.webhookMethod) +
+            '</select></div>' +
+            '<div class="field"><label class="field-lbl">우선순위</label><input type="number" value="' + escapeHtml(String(form.priority)) + '" oninput="setField(\'priority\', Number(this.value || 100), false)" /></div>' +
+          '</div>' +
+          '<div class="field-row">' +
+            '<div class="field"><label class="field-lbl">활성화</label><select onchange="setField(\'enabled\', this.value === \'true\', false)">' +
+              '<option value="true" ' + (form.enabled ? "selected" : "") + '>활성</option>' +
+              '<option value="false" ' + (!form.enabled ? "selected" : "") + '>일시 정지</option>' +
+            '</select></div>' +
+          '</div>' +
+          '<div class="field"><label class="field-lbl">헤더 <span class="placeholder">(한 줄에 Key: Value)</span></label>' +
+            '<textarea rows="3" placeholder="X-App: NotiFlow&#10;Authorization: Bearer ..." oninput="setField(\'headersRaw\', this.value, false)">' + escapeHtml(form.headersRaw) + '</textarea></div>' +
+          '<div class="field"><label class="field-lbl">페이로드 템플릿 <span class="placeholder">(선택)</span></label>' +
+            '<textarea rows="3" placeholder="{&quot;title&quot;:{{title}},&quot;text&quot;:{{text}}}" oninput="setField(\'payloadTemplate\', this.value, false)">' + escapeHtml(form.payloadTemplate) + '</textarea></div>' +
+          '<div class="field"><label class="field-lbl">토큰 ' + (isEdit ? "(비워두면 기존 값 유지)" : "(선택)") + '</label>' +
+            '<input type="password" placeholder="Bearer 비밀 토큰" value="' + escapeHtml(form.token) + '" oninput="setField(\'token\', this.value, false)" />' +
+            (isEdit && form.hasTokenRef ? '<label class="token-check"><input type="checkbox" ' + (form.removeToken ? "checked" : "") + ' onchange="setField(\'removeToken\', this.checked, false)" /> 저장된 토큰 삭제</label>' : '') +
+          '</div>' +
+          '<div id="diffHost"></div>' +
+          '<div class="actions"><button type="submit">' + (isEdit ? "변경사항 저장" : "규칙 만들기") + '</button><button type="button" class="ghost" onclick="resetForm()">초기화</button></div>' +
+        '</form>';
+      renderExpressionPreview();
+      renderDiffBox();
+    }
+
+    function renderGroups() {
+      return form.groups.map((group, groupIdx) => {
+        const canDeleteGroup = form.groups.length > 1;
+        const isLastGroup = groupIdx === form.groups.length - 1;
+        return '<div class="group-card">' +
+          '<div class="group-head"><div class="group-title">그룹 ' + (groupIdx + 1) + '</div>' +
+          '<button type="button" class="group-del" onclick="removeGroup(\'' + group.id + '\')" ' + (canDeleteGroup ? "" : "disabled") + '>삭제</button></div>' +
+          '<div class="group-conds">' + group.conditions.map((cond, condIdx) =>
+            '<div class="cond-item"><div class="cond-row">' +
+              '<select onchange="setGroupCond(\'' + group.id + '\',\'' + cond.id + '\',\'type\',this.value)">' +
+                optionHtml("text.contains", cond.type, "본문 포함") +
+                optionHtml("title.contains", cond.type, "제목 포함") +
+                optionHtml("text.regex", cond.type, "본문 정규식") +
+              '</select>' +
+              '<input placeholder="값" value="' + escapeHtml(cond.value) + '" oninput="setGroupCond(\'' + group.id + '\',\'' + cond.id + '\',\'value\',this.value)" />' +
+              '<button type="button" class="cond-add" onclick="addCondInGroup(\'' + group.id + '\',' + condIdx + ')" title="이 그룹에 조건 추가">+</button>' +
+              '<button type="button" class="cond-del" onclick="removeCondInGroup(\'' + group.id + '\',\'' + cond.id + '\')" title="조건 삭제">×</button>' +
+            '</div></div>'
+          ).join("") + '</div>' +
+          (group.conditions.length > 1 ? operatorRow("그룹 내부", group.intraOp, "setGroupField('" + group.id + "','intraOp',") : "") +
+          (!isLastGroup ? operatorRow("다음 그룹", group.nextGroupOp || "AND", "setGroupField('" + group.id + "','nextGroupOp',", " between") : "") +
+        '</div>';
+      }).join("");
+    }
+
+    function operatorRow(label, selected, callPrefix, extraClass) {
+      return '<div class="group-op-row' + (extraClass || "") + '"><span class="cond-link-lbl">' + label + '</span><div class="seg">' +
+        ["AND", "OR"].map((op) => '<button type="button" class="seg-opt ' + (normLogicOp(selected) === op ? "active" : "") + '" onclick="' + callPrefix + '\'' + op + '\')">' + op + '</button>').join("") +
+      '</div></div>';
+    }
+
+    function optionHtml(value, selected, label) {
+      return '<option value="' + escapeHtml(value) + '" ' + (String(selected) === value ? "selected" : "") + '>' + escapeHtml(label || value) + '</option>';
+    }
+
+    function setField(name, value, rerender) {
+      form[name] = value;
+      if (rerender) renderRuleForm();
+      else renderDiffBox();
+    }
+
+    function setGroupField(groupIdValue, field, value) {
+      form.groups = form.groups.map((group) => group.id === groupIdValue ? { ...group, [field]: normLogicOp(value) } : group);
+      renderRuleForm();
+    }
+
+    function setGroupCond(groupIdValue, condIdValue, field, value) {
+      form.groups = form.groups.map((group) => group.id !== groupIdValue ? group : {
+        ...group,
+        conditions: group.conditions.map((cond) => cond.id === condIdValue ? { ...cond, [field]: value } : cond)
+      });
+      renderExpressionPreview();
+      renderDiffBox();
+    }
+
+    function addGroup() {
+      const next = form.groups.slice();
+      if (next.length) next[next.length - 1] = { ...next[next.length - 1], nextGroupOp: normLogicOp(next[next.length - 1].nextGroupOp, "OR") };
+      next.push(blankGroup("AND", null));
+      form.groups = next;
+      renderRuleForm();
+    }
+
+    function removeGroup(groupIdValue) {
+      const next = form.groups.filter((group) => group.id !== groupIdValue);
+      form.groups = next.length ? next : [blankGroup()];
+      form.groups[form.groups.length - 1].nextGroupOp = null;
+      renderRuleForm();
+    }
+
+    function addCondInGroup(groupIdValue, afterIdx) {
+      form.groups = form.groups.map((group) => {
+        if (group.id !== groupIdValue) return group;
+        const nextConds = group.conditions.slice();
+        nextConds.splice(afterIdx + 1, 0, blankCond());
+        return { ...group, conditions: nextConds };
+      });
+      renderRuleForm();
+    }
+
+    function removeCondInGroup(groupIdValue, condIdValue) {
+      form.groups = form.groups.map((group) => {
+        if (group.id !== groupIdValue) return group;
+        const nextConds = group.conditions.filter((cond) => cond.id !== condIdValue);
+        return { ...group, conditions: nextConds.length ? nextConds : [blankCond()] };
+      });
+      renderRuleForm();
+    }
+
+    function expressionRowsForSubmit(groups) {
+      const rows = [];
+      for (let groupIdx = 0; groupIdx < groups.length; groupIdx++) {
+        const group = groups[groupIdx];
+        const conditions = group.conditions.map((cond) => ({
+          type: String(cond.type || "text.contains"),
+          value: String(cond.value || "").trim()
+        })).filter((cond) => cond.value);
+        if (!conditions.length) return { ok: false, error: "조건 값을 입력하세요." };
+        for (let condIdx = 0; condIdx < conditions.length; condIdx++) {
+          const isLastCond = condIdx === conditions.length - 1;
+          const isLastGroup = groupIdx === groups.length - 1;
+          const row = {
+            type: conditions[condIdx].type,
+            value: conditions[condIdx].value,
+            openParen: condIdx === 0 && conditions.length > 1 ? 1 : 0,
+            closeParen: isLastCond && conditions.length > 1 ? 1 : 0
+          };
+          if (!isLastCond) row.operator = normLogicOp(group.intraOp, "AND");
+          else if (!isLastGroup) row.operator = normLogicOp(group.nextGroupOp, "AND");
+          rows.push(row);
+        }
+      }
+      return { ok: true, rows };
+    }
+
+    function renderExpressionPreview() {
+      const target = document.getElementById("exprPreview");
+      if (!target) return;
+      const result = expressionRowsForSubmit(form.groups);
+      target.textContent = result.ok ? normConds(result.rows) : result.error;
+    }
+
+    function normConds(rows) {
+      return (rows || []).map((row) => {
+        const open = "(".repeat(Number(row.openParen || 0));
+        const close = ")".repeat(Number(row.closeParen || 0));
+        const op = row.operator ? " " + row.operator : "";
+        return open + row.type + ":" + row.value + close + op;
+      }).join(" ");
+    }
+
+    function toEditableGroups(rule) {
+      const rows = rowsOf(rule);
+      if (!rows.length) return [blankGroup()];
+      const groups = [];
+      let current = null;
+      let currentHasParen = false;
+      let currentIntraOp = "AND";
+      rows.forEach((row, idx) => {
+        if (!current) {
+          current = blankGroup();
+          current.conditions = [];
+          currentHasParen = Number(row.openParen || 0) > 0;
+          currentIntraOp = "AND";
+        }
+        if (current.conditions.length > 0) currentIntraOp = normLogicOp(rows[idx - 1]?.operator, "AND");
+        current.conditions.push({ id: condId(), type: String(row.type || "text.contains"), value: String(row.value || "") });
+        const isLast = idx === rows.length - 1;
+        const next = rows[idx + 1];
+        const closesGroup = isLast || Number(row.closeParen || 0) > 0 || (!currentHasParen && rows.length > 1) || Number(next?.openParen || 0) > 0;
+        if (closesGroup) {
+          current.intraOp = currentIntraOp;
+          current.nextGroupOp = isLast ? null : normLogicOp(row.operator, "AND");
+          groups.push(current);
+          current = null;
+        }
+      });
+      return groups.length ? groups : [blankGroup()];
+    }
+
+    function ruleToNorm(rule) {
+      const webhook = webhookOf(rule);
+      return {
+        packageName: String((rule.targetPackages || [])[0] || ""),
+        name: String(rule.name || ""),
+        conditions: normConds(rowsOf(rule)),
+        webhookUrl: String(webhook.url || ""),
+        webhookMethod: String(webhook.method || "POST"),
+        headersRaw: headersText(webhook.headers),
+        payloadTemplate: String(webhook.payloadTemplate || ""),
+        enabled: Boolean(rule.enabled),
+        priority: Number(rule.priority || 100)
+      };
+    }
+
+    function formToNorm() {
+      const result = expressionRowsForSubmit(form.groups);
+      return {
+        packageName: form.packageName,
+        name: form.name,
+        conditions: result.ok ? normConds(result.rows) : "",
+        webhookUrl: form.webhookUrl,
+        webhookMethod: form.webhookMethod,
+        headersRaw: form.headersRaw,
+        payloadTemplate: form.payloadTemplate,
+        enabled: form.enabled,
+        priority: Number(form.priority || 100)
+      };
+    }
+
+    function renderDiffBox() {
+      const host = document.getElementById("diffHost");
+      if (!host || !baseline || form.id === null) return;
+      const current = formToNorm();
+      const labels = {
+        packageName: "대상 앱",
+        name: "규칙 이름",
+        conditions: "조건",
+        webhookUrl: "Webhook URL",
+        webhookMethod: "메서드",
+        headersRaw: "헤더",
+        payloadTemplate: "페이로드",
+        enabled: "활성화",
+        priority: "우선순위"
+      };
+      const diffs = Object.keys(labels).filter((key) => String(baseline[key] ?? "") !== String(current[key] ?? ""));
+      host.innerHTML = diffs.length ? '<div class="diff-box"><div class="diff-lbl">변경사항</div>' + diffs.map((key) =>
+        '<div class="diff-line"><strong>' + labels[key] + '</strong>: ' + escapeHtml(String(baseline[key] ?? "")) + ' → ' + escapeHtml(String(current[key] ?? "")) + '</div>'
+      ).join("") + '</div>' : "";
+    }
+
+    function openPackagePicker() {
+      pickerQuery = "";
+      document.getElementById("picker-query").value = "";
+      document.getElementById("includeSystemApps").checked = includeSystemApps;
+      document.getElementById("pickerBackdrop").classList.add("open");
+      document.getElementById("pickerDialog").classList.add("open");
+      loadApps(includeSystemApps);
+    }
+
+    function closePackagePicker() {
+      document.getElementById("pickerBackdrop").classList.remove("open");
+      document.getElementById("pickerDialog").classList.remove("open");
+    }
+
+    function setPickerQuery(value) {
+      pickerQuery = value;
+      renderPackagePicker();
+    }
+
+    async function setIncludeSystemApps(checked) {
+      includeSystemApps = checked;
+      await loadApps(includeSystemApps);
+    }
+
+    function renderPackagePicker() {
+      const list = document.getElementById("pickerList");
+      const count = document.getElementById("pickerCount");
+      if (!list || !count) return;
+      const query = pickerQuery.trim().toLowerCase();
+      const filtered = query ? installedApps.filter((app) =>
+        String(app.appLabel || "").toLowerCase().includes(query) ||
+        String(app.packageName || "").toLowerCase().includes(query)
+      ) : installedApps;
+      count.textContent = filtered.length + "개 / 전체 " + installedApps.length + "개";
+      list.innerHTML = filtered.length ? filtered.map((app) =>
+        '<button type="button" class="picker-item" onclick="selectPackage(\'' + escapeJs(app.packageName) + '\')">' +
+          '<span class="picker-item-label">' + escapeHtml(app.appLabel || app.packageName) + '</span>' +
+          '<span class="picker-item-package">' + escapeHtml(app.packageName) + '</span>' +
+        '</button>'
+      ).join("") : '<div class="picker-empty">설치된 앱을 찾을 수 없습니다.</div>';
+    }
+
+    function selectPackage(packageName) {
+      form.packageName = packageName;
+      closePackagePicker();
+      renderRuleForm();
     }
 
     async function saveRule(event) {
       event.preventDefault();
-      const id = document.getElementById("ruleId").value;
-      const token = document.getElementById("tokenValue").value.trim();
+      const id = form.id;
+      const rowsResult = expressionRowsForSubmit(form.groups);
+      if (!rowsResult.ok) { alert(rowsResult.error); return; }
+      const token = String(form.token || "").trim();
       const webhook = {
-        url: document.getElementById("webhookUrl").value.trim(),
-        method: document.getElementById("webhookMethod").value
+        url: String(form.webhookUrl || "").trim(),
+        method: form.webhookMethod
       };
-      const headers = parseHeaders(document.getElementById("headersRaw").value);
+      const headers = parseHeaders(form.headersRaw);
       if (Object.keys(headers).length) webhook.headers = headers;
-      const payloadTemplate = document.getElementById("payloadTemplate").value.trim();
+      const payloadTemplate = String(form.payloadTemplate || "").trim();
       if (payloadTemplate) webhook.payloadTemplate = payloadTemplate;
-      if (token) webhook.token = token;
+      if (id === null && token) webhook.token = token;
+      if (id !== null) {
+        if (form.removeToken) webhook.token = "";
+        else if (token) webhook.token = token;
+      }
+      const validConds = rowsResult.rows.map((row) => ({ type: row.type, value: row.value }));
+      const payloadRows = rowsResult.rows.map((row, idx, arr) => ({
+        type: row.type,
+        value: row.value,
+        openParen: row.openParen,
+        closeParen: row.closeParen,
+        ...(idx < arr.length - 1 ? { operator: row.operator } : {})
+      }));
+      const legacyOperator = rowsResult.rows.length > 1 ? normLogicOp(rowsResult.rows[0].operator, "AND") : "AND";
 
       const body = {
-        name: document.getElementById("ruleName").value.trim(),
-        packageName: document.getElementById("packageName").value.trim(),
-        enabled: document.getElementById("enabled").value === "true",
-        priority: Number(document.getElementById("priority").value || 100),
-        conditionExpression: { rows: JSON.parse(document.getElementById("conditionRows").value) },
+        name: String(form.name || "").trim(),
+        packageName: String(form.packageName || "").trim(),
+        enabled: Boolean(form.enabled),
+        priority: Number(form.priority || 100),
+        conditionOperator: legacyOperator,
+        conditions: validConds,
+        conditionExpression: { rows: payloadRows },
         webhook
       };
 
@@ -605,6 +986,9 @@ class PcSettingsServer(
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[char]));
+    }
+    function escapeJs(value) {
+      return String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     }
 
     resetForm();

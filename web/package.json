@@ -21,6 +21,7 @@
     "test:topbar-ui": "node scripts/verify-topbar-ui.mjs",
     "test:play-readiness": "node scripts/verify-play-readiness.mjs",
     "test:pc-settings-server": "node scripts/verify-pc-settings-server.mjs",
+    "test:pc-rule-form": "node scripts/verify-pc-rule-form-parity.mjs",
     "test:rule-transfer": "node scripts/verify-rule-transfer.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "send:user-push": "node scripts/send-user-push.mjs"
