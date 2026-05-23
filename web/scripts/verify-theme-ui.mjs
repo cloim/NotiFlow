@@ -46,8 +46,17 @@ if (!mainActivity.includes("isAppearanceLightStatusBars = isLight")) {
 if (!mainActivity.includes("window.statusBarColor")) {
   failures.push("MainActivity must set a status bar background that matches the resolved theme");
 }
-if (!mainActivity.includes("WindowCompat.setDecorFitsSystemWindows(window, true)")) {
-  failures.push("MainActivity must keep WebView content out of the transparent system status bar area");
+if (!mainActivity.includes("WindowCompat.setDecorFitsSystemWindows(window, false)")) {
+  failures.push("MainActivity must draw edge-to-edge so it can paint the transparent system status bar area");
+}
+if (!mainActivity.includes("systemBarScrim")) {
+  failures.push("MainActivity must render a native status bar scrim above the WebView");
+}
+if (!mainActivity.includes("WindowInsetsCompat.Type.statusBars()")) {
+  failures.push("MainActivity must size the status bar scrim from status bar insets");
+}
+if (!mainActivity.includes("systemBarScrim.setBackgroundColor(background)")) {
+  failures.push("MainActivity must sync the status bar scrim background to the resolved theme");
 }
 if (!mainActivity.includes("window.navigationBarColor = background")) {
   failures.push("MainActivity must set a navigation bar background that matches the resolved theme");

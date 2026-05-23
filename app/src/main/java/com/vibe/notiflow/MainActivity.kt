@@ -14,6 +14,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -23,6 +26,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,7 +40,9 @@ import androidx.credentials.exceptions.NoCredentialException
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewAssetLoader
 import com.cloimism.notiflow.BuildConfig
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
@@ -84,7 +90,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
+    private lateinit var rootLayout: FrameLayout
     private lateinit var webView: WebView
+    private lateinit var systemBarScrim: View
     private lateinit var assetLoader: WebViewAssetLoader
     private val updateHttpClient = OkHttpClient()
     private val bridge = NotiFlowBridge()
@@ -135,7 +143,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setSystemBarsTheme(isLight = false)
         requestPostNotificationsPermissionIfNeeded()
 
@@ -196,6 +204,35 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(bridge, "NotiFlowNative")
         }
 
+        rootLayout = FrameLayout(this).apply {
+            setBackgroundColor(Color.rgb(7, 9, 15))
+            addView(
+                webView,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
+        systemBarScrim = View(this).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        rootLayout.addView(
+            systemBarScrim,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                Gravity.TOP
+            )
+        )
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { _, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            systemBarScrim.layoutParams = systemBarScrim.layoutParams.apply {
+                height = statusBars.top
+            }
+            insets
+        }
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) {
@@ -207,7 +244,9 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        setContentView(webView)
+        setContentView(rootLayout)
+        setSystemBarsTheme(isLight = false)
+        ViewCompat.requestApplyInsets(rootLayout)
         loadConfiguredWebApp()
     }
 
@@ -290,8 +329,15 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun setSystemBarsTheme(isLight: Boolean) {
         val background = if (isLight) Color.rgb(246, 248, 251) else Color.rgb(7, 9, 15)
+        window.decorView.setBackgroundColor(background)
         window.statusBarColor = background
         window.navigationBarColor = background
+        if (::rootLayout.isInitialized) {
+            rootLayout.setBackgroundColor(background)
+        }
+        if (::systemBarScrim.isInitialized) {
+            systemBarScrim.setBackgroundColor(background)
+        }
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = isLight
             isAppearanceLightNavigationBars = isLight
