@@ -135,6 +135,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setSystemBarsTheme(isLight = false)
         requestPostNotificationsPermissionIfNeeded()
 
