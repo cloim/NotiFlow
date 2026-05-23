@@ -25,7 +25,8 @@ for (const text of [
 for (const text of [
   "FirebaseAuth",
   "CredentialManager",
-  "GetGoogleIdOption",
+  "GetSignInWithGoogleOption",
+  "NoCredentialException",
   "GoogleAuthProvider",
   "getAuthState",
   "signInWithGoogle",

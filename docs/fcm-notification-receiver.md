@@ -41,9 +41,10 @@ Google provider status:
 
 - Identity Toolkit API: enabled
 - Debug SHA fingerprints: registered on both Android apps
-- Google provider: still requires Firebase Console setup because the REST API rejected provider activation without an OAuth client ID/secret
+- Release SHA fingerprints: registered on the production Android app
+- Google provider: enabled
 
-Finish the provider setup in Firebase Console:
+If the provider setup needs to be repaired later:
 
 1. Open Authentication > Sign-in method.
 2. Enable Google.
@@ -54,8 +55,10 @@ The current debug signing fingerprints registered in Firebase are:
 
 - debug SHA-1: `90:5B:82:75:A6:4D:22:E6:D5:8C:8D:A8:32:CD:1B:A6:3E:7B:91:AC`
 - debug SHA-256: `2D:E3:91:60:38:02:F4:FE:9E:34:B4:A8:4B:F0:CB:8D:ED:E2:C3:75:6A:67:C3:E7:9E:D3:FD:0D:FF:A2:26:FA`
+- release SHA-1: `3C:58:8C:ED:AD:40:17:5F:E5:40:47:DD:AA:1F:B5:44:7C:91:FB:F6`
+- release SHA-256: `21:0F:04:9C:2F:7A:47:8C:16:A4:C2:82:B3:8E:AE:6E:11:45:FC:37:D8:C0:1A:A4:BF:B4:D3:3A:2B:FB:86:A6`
 
-Release Google Sign-In also needs the release keystore SHA-1/SHA-256 fingerprints registered on the matching Firebase Android app before distributing a signed APK.
+After changing SHA fingerprints, download a fresh `google-services.json` and update the `GOOGLE_SERVICES_JSON_BASE64` GitHub Actions secret before creating a release tag.
 
 ## Push token registration
 
