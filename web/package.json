@@ -11,6 +11,10 @@
     "test:android-icon": "node scripts/verify-android-app-icon.mjs",
     "test:android-package": "node scripts/verify-android-package-id.mjs",
     "test:github-update": "node scripts/verify-github-update.mjs",
+    "test:fcm-notifications": "node scripts/verify-fcm-notification-receiver.mjs",
+    "test:google-auth": "node scripts/verify-google-auth.mjs",
+    "test:push-token-registration": "node scripts/verify-push-token-registration.mjs",
+    "test:user-push-sender": "node scripts/verify-user-push-sender.mjs",
     "test:korean-ui": "node scripts/verify-korean-ui.mjs",
     "test:safe-area": "node scripts/verify-safe-area-css.mjs",
     "test:theme-ui": "node scripts/verify-theme-ui.mjs",
@@ -18,7 +22,8 @@
     "test:play-readiness": "node scripts/verify-play-readiness.mjs",
     "test:pc-settings-server": "node scripts/verify-pc-settings-server.mjs",
     "test:rule-transfer": "node scripts/verify-rule-transfer.mjs",
-    "preview": "vite preview --host 0.0.0.0 --port 4173"
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "send:user-push": "node scripts/send-user-push.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

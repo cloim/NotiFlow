@@ -130,6 +130,7 @@ gradlew.bat testDevDebugUnitTest
 - `ANDROID_RELEASE_KEY_ALIAS`: release key alias
 - `ANDROID_RELEASE_KEYSTORE_PASSWORD`: keystore password
 - `ANDROID_RELEASE_KEY_PASSWORD`: key password
+- `GOOGLE_SERVICES_JSON_BASE64`: Firebase Android `google-services.json` 파일을 base64 인코딩한 값
 
 Windows PowerShell에서 keystore를 base64로 인코딩하는 예:
 ```powershell

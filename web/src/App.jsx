@@ -1059,6 +1059,8 @@ export default function App() {
   const [pcServerInfo, setPcServerInfo] = useState({ running: false, url: "" });
   const [pcServerTokenDraft, setPcServerTokenDraft] = useState("");
   const [pcServerBusy, setPcServerBusy] = useState(false);
+  const [authState, setAuthState] = useState({ signedIn: false });
+  const [authBusy, setAuthBusy] = useState(false);
   const [isExportSheetOpen, setIsExportSheetOpen] = useState(false);
   const [selectedExportRuleIds, setSelectedExportRuleIds] = useState(() => new Set());
   const [includeExportSecrets, setIncludeExportSecrets] = useState(false);
@@ -1131,6 +1133,40 @@ export default function App() {
       setPcServerTokenDraft(nextInfo.configuredToken || nextInfo.token || "");
     }
   }, [native]);
+
+  const loadAuthState = useCallback((nextState = null) => {
+    if (nextState) {
+      setAuthState(nextState);
+      return;
+    }
+    if (!native?.getAuthState) return;
+    const r = parseBridge(native.getAuthState());
+    if (r?.ok) setAuthState(r.data ?? { signedIn: false });
+    else showToast(r?.error ?? "로그인 상태를 확인하지 못했습니다.", "err");
+  }, [native, showToast]);
+
+  const signInWithGoogle = useCallback(() => {
+    if (!native?.signInWithGoogle) {
+      showToast("Google 로그인을 사용할 수 없습니다.", "err");
+      return;
+    }
+    setAuthBusy(true);
+    const r = parseBridge(native.signInWithGoogle());
+    if (!r?.ok) {
+      setAuthBusy(false);
+      showToast(r?.error ?? "Google 로그인을 시작하지 못했습니다.", "err");
+    }
+  }, [native, showToast]);
+
+  const signOutGoogle = useCallback(() => {
+    if (!native?.signOutGoogle) return;
+    setAuthBusy(true);
+    const r = parseBridge(native.signOutGoogle());
+    if (!r?.ok) {
+      setAuthBusy(false);
+      showToast(r?.error ?? "로그아웃하지 못했습니다.", "err");
+    }
+  }, [native, showToast]);
 
   const startPcSettingsServer = useCallback(() => {
     if (!native?.startPcSettingsServer) return;
@@ -1262,8 +1298,19 @@ export default function App() {
   useEffect(() => {
     loadAppInfo();
     loadPcSettingsServerStatus();
+    loadAuthState();
     refresh();
-  }, [loadAppInfo, loadPcSettingsServerStatus, refresh]);
+  }, [loadAppInfo, loadPcSettingsServerStatus, loadAuthState, refresh]);
+
+  useEffect(() => {
+    const onAuthChanged = (event) => {
+      setAuthBusy(false);
+      loadAuthState(event.detail);
+      if (event.detail?.authError) showToast(event.detail.authError, "err");
+    };
+    window.addEventListener("notiflowAuthChanged", onAuthChanged);
+    return () => window.removeEventListener("notiflowAuthChanged", onAuthChanged);
+  }, [loadAuthState]);
 
   useEffect(() => {
     if (!isNative) return undefined;
@@ -1638,7 +1685,7 @@ export default function App() {
     ? refresh
     : tab === "logs"
       ? loadLogs
-      : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadPerm(); void checkForUpdate(true); };
+      : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadAuthState(); loadPerm(); void checkForUpdate(true); };
   const topbarBusy = tab === "rules" || tab === "logs" ? busy || ruleTransferBusy : updateBusy;
   const canExportRules = Boolean(native?.exportRules);
   const canImportRules = Boolean(native?.importRules);
@@ -1808,6 +1855,45 @@ export default function App() {
                 리스너 설정 열기
               </button>
             )}
+          </div>
+
+          <div className="settings-section">
+            <div className="section-lbl">계정</div>
+            <div className={`account-card${authState?.signedIn ? " signed-in" : ""}`}>
+              <div className="account-main">
+                <div className="account-avatar">G</div>
+                <div className="account-copy">
+                  <div className="account-title">
+                    {authState?.signedIn ? (authState.displayName || "Google 계정") : "로그인 안 됨"}
+                  </div>
+                  <div className="account-email">
+                    {authState?.signedIn ? (authState.email || authState.uid) : "사용자 식별 대기"}
+                  </div>
+                </div>
+              </div>
+              {authState?.signedIn && (
+                <div className="account-uid">{authState.uid}</div>
+              )}
+              <div className="account-actions">
+                {authState?.signedIn ? (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={signOutGoogle}
+                    disabled={!isNative || authBusy}
+                  >
+                    로그아웃
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    onClick={signInWithGoogle}
+                    disabled={!isNative || authBusy}
+                  >
+                    {authBusy ? "로그인 중..." : "Google로 로그인"}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="settings-section">
