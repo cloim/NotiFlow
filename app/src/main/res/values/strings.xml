@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">NotiFlow</string>
+    <string name="fcm_default_notification_channel_id">notiflow_push</string>
 </resources>

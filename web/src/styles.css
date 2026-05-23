@@ -1210,6 +1210,70 @@ input[type="datetime-local"].field-input {
   white-space: nowrap;
 }
 
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.account-card.signed-in {
+  border-color: rgba(16,185,129,.24);
+  background: color-mix(in srgb, var(--green-dim) 24%, var(--card));
+}
+.account-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #fff;
+  color: #4285f4;
+  font-size: 19px;
+  font-weight: 900;
+  border: 1px solid var(--border-hi);
+}
+.account-copy {
+  min-width: 0;
+  flex: 1;
+}
+.account-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-email,
+.account-uid {
+  color: var(--t2);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-uid {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(15,23,42,.30);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, monospace;
+}
+.account-actions {
+  display: flex;
+}
+
 .perm-card {
   display: flex; align-items: center; gap: 14px;
   padding: 16px;

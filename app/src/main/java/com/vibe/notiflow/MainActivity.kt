@@ -1,16 +1,19 @@
 package com.vibe.notiflow
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -23,10 +26,24 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.Credential
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.ClearCredentialException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.core.view.WindowCompat
 import androidx.webkit.WebViewAssetLoader
 import com.cloimism.notiflow.BuildConfig
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.vibe.notiflow.di.ServiceLocator
 import com.vibe.notiflow.domain.engine.ConditionExpressionEvaluator
 import com.vibe.notiflow.domain.model.ActionSpec
@@ -36,6 +53,7 @@ import com.vibe.notiflow.domain.model.FilterOperator
 import com.vibe.notiflow.domain.model.FilterSpec
 import com.vibe.notiflow.domain.model.Rule
 import com.vibe.notiflow.domain.transfer.RuleTransfer
+import com.vibe.notiflow.notification.PushTokenRegistrar
 import com.vibe.notiflow.pc.PcSettingsServer
 import com.vibe.notiflow.update.GitHubReleaseUpdate
 import com.vibe.notiflow.update.UpdateCandidate
@@ -48,7 +66,9 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -68,6 +88,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var assetLoader: WebViewAssetLoader
     private val updateHttpClient = OkHttpClient()
     private val bridge = NotiFlowBridge()
+    private val firebaseAuth by lazy { FirebaseAuth.getInstance() }
+    private val credentialManager by lazy { CredentialManager.create(this) }
+    private val pushTokenRegistrar by lazy { PushTokenRegistrar(this) }
+    private var lastAuthError: String? = null
     private var pcSettingsServer: PcSettingsServer? = null
     private var pendingFileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingExportFileName: String? = null
@@ -104,11 +128,15 @@ class MainActivity : ComponentActivity() {
             } ?: error("failed to open output stream")
         }
     }
+    private val requestPostNotificationsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setSystemBarsTheme(isLight = false)
+        requestPostNotificationsPermissionIfNeeded()
 
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
@@ -266,6 +294,17 @@ class MainActivity : ComponentActivity() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = isLight
             isAppearanceLightNavigationBars = isLight
+        }
+    }
+
+    private fun requestPostNotificationsPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            requestPostNotificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -704,6 +743,112 @@ class MainActivity : ComponentActivity() {
         pcSettingsServer?.setToken(token)
     }
 
+    private fun authStateJson(): JSONObject {
+        val user = firebaseAuth.currentUser
+        return JSONObject().apply {
+            put("signedIn", user != null)
+            user?.let {
+                put("uid", it.uid)
+                put("email", it.email ?: "")
+                put("displayName", it.displayName ?: "")
+                put("photoUrl", it.photoUrl?.toString() ?: "")
+            }
+            lastAuthError?.let { put("authError", it) }
+        }
+    }
+
+    private fun defaultWebClientId(): String {
+        val resId = resources.getIdentifier("default_web_client_id", "string", packageName)
+        if (resId == 0) {
+            throw IllegalStateException("Firebase Google OAuth client 설정이 없습니다. google-services.json을 갱신하세요.")
+        }
+        return getString(resId)
+    }
+
+    private suspend fun getGoogleCredential(filterByAuthorizedAccounts: Boolean): Credential {
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(filterByAuthorizedAccounts)
+            .setServerClientId(defaultWebClientId())
+            .build()
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        return credentialManager.getCredential(this, request).credential
+    }
+
+    private suspend fun signInWithGoogleCredential(credential: Credential) {
+        if (credential !is CustomCredential || credential.type != TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+            throw IllegalArgumentException("Google 계정 정보를 가져오지 못했습니다.")
+        }
+
+        val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
+        val firebaseCredential = GoogleAuthProvider.getCredential(googleCredential.idToken, null)
+        firebaseAuth.signInWithCredential(firebaseCredential).await()
+    }
+
+    private fun startGoogleSignIn() {
+        lifecycleScope.launch {
+            lastAuthError = null
+            runCatching {
+                val credential = runCatching {
+                    getGoogleCredential(filterByAuthorizedAccounts = true)
+                }.recoverCatching { error ->
+                    if (error is GetCredentialException) {
+                        getGoogleCredential(filterByAuthorizedAccounts = false)
+                    } else {
+                        throw error
+                    }
+                }.getOrThrow()
+
+                signInWithGoogleCredential(credential)
+                runCatching {
+                    pushTokenRegistrar.registerCurrentToken()
+                }.onFailure { error ->
+                    lastAuthError = "로그인은 됐지만 푸시 토큰 등록에 실패했습니다."
+                    Log.w("NotiFlow", "Push token registration failed", error)
+                }
+            }.onFailure { error ->
+                lastAuthError = error.message ?: "Google 로그인에 실패했습니다."
+                Log.w("NotiFlow", "Google sign-in failed", error)
+            }
+            notifyAuthStateChanged()
+        }
+    }
+
+    private fun signOutGoogleAccount() {
+        lifecycleScope.launch {
+            lastAuthError = null
+            runCatching {
+                pushTokenRegistrar.unregisterCurrentToken()
+            }.onFailure { error ->
+                Log.w("NotiFlow", "Push token unregister failed", error)
+            }
+            firebaseAuth.signOut()
+            runCatching {
+                credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            }.onFailure { error ->
+                if (error is ClearCredentialException) {
+                    Log.w("NotiFlow", "Credential state clear failed", error)
+                } else {
+                    throw error
+                }
+            }
+            notifyAuthStateChanged()
+        }
+    }
+
+    private fun notifyAuthStateChanged() {
+        if (!::webView.isInitialized) return
+        val payload = authStateJson().toString()
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('notiflowAuthChanged', { detail: $payload }))",
+                null
+            )
+        }
+    }
+
     inner class NotiFlowBridge {
         @JavascriptInterface
         fun getAppInfo(): String {
@@ -750,6 +895,29 @@ class MainActivity : ComponentActivity() {
                 savePcSettingsToken(token.trim())
                 okResponse(pcSettingsServerStateJson(pcSettingsServer?.status() ?: PcSettingsServer.State(false)))
             }.getOrElse { errorResponse(it.message ?: "PC 설정 서버 토큰을 저장하지 못했습니다.") }
+        }
+
+        @JavascriptInterface
+        fun getAuthState(): String {
+            return runCatching {
+                okResponse(authStateJson())
+            }.getOrElse { errorResponse(it.message ?: "로그인 상태를 확인하지 못했습니다.") }
+        }
+
+        @JavascriptInterface
+        fun signInWithGoogle(): String {
+            return runCatching {
+                startGoogleSignIn()
+                okResponse()
+            }.getOrElse { errorResponse(it.message ?: "Google 로그인을 시작하지 못했습니다.") }
+        }
+
+        @JavascriptInterface
+        fun signOutGoogle(): String {
+            return runCatching {
+                signOutGoogleAccount()
+                okResponse()
+            }.getOrElse { errorResponse(it.message ?: "로그아웃하지 못했습니다.") }
         }
 
         @JavascriptInterface
