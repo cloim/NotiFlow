@@ -475,7 +475,7 @@ class PcSettingsServer(
     let installedApps = [];
     let includeSystemApps = false;
     let pickerQuery = "";
-    let form = emptyForm();
+    let form;
     let baseline = null;
     let nextId = 1;
 
@@ -515,6 +515,7 @@ class PcSettingsServer(
         priority: 100
       };
     }
+    form = emptyForm();
     const parseHeaders = (raw) => Object.fromEntries(String(raw || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
       const idx = line.indexOf(":");
       if (idx <= 0) throw new Error("헤더 형식이 올바르지 않습니다: " + line);
