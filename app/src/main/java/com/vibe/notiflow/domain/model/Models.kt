@@ -57,4 +57,14 @@ data class ExecutionLog(
     val eventTitle: String?
 )
 
+@Serializable
+data class ReceivedNotification(
+    val id: Long = 0,
+    val title: String?,
+    val body: String?,
+    val sender: String?,
+    val data: Map<String, String> = emptyMap(),
+    val receivedAt: Long
+)
+
 data class ActionResult(val success: Boolean, val message: String, val retryable: Boolean = false)

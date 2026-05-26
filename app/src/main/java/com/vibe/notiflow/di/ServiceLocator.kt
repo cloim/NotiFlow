@@ -21,11 +21,14 @@ object ServiceLocator {
     private val db: NotiFlowDatabase by lazy {
         Room.databaseBuilder(appContext, NotiFlowDatabase::class.java, "notiflow.db")
             .addMigrations(NotiFlowDatabase.MIGRATION_1_2)
+            .addMigrations(NotiFlowDatabase.MIGRATION_2_3)
             .build()
     }
 
     val secureStore: SecureStore by lazy { SecureStore(appContext) }
-    val ruleRepository: RuleRepository by lazy { RuleRepository(db.ruleDao(), db.logDao()) }
+    val ruleRepository: RuleRepository by lazy {
+        RuleRepository(db.ruleDao(), db.logDao(), db.receivedNotificationDao())
+    }
 
     private val filterRegistry: FilterRegistry by lazy {
         FilterRegistry(listOf(PackageEqualsFilter(), TitleContainsFilter(), TextContainsFilter(), TextRegexFilter()))

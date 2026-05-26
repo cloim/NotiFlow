@@ -15,6 +15,7 @@
     "test:google-auth": "node scripts/verify-google-auth.mjs",
     "test:push-token-registration": "node scripts/verify-push-token-registration.mjs",
     "test:user-push-sender": "node scripts/verify-user-push-sender.mjs",
+    "test:received-notifications": "node scripts/verify-received-notification-tab.mjs",
     "test:korean-ui": "node scripts/verify-korean-ui.mjs",
     "test:safe-area": "node scripts/verify-safe-area-css.mjs",
     "test:theme-ui": "node scripts/verify-theme-ui.mjs",

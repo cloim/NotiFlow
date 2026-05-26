@@ -27,3 +27,13 @@ data class ExecutionLogEntity(
     val eventPackage: String,
     val eventTitle: String?
 )
+
+@Entity(tableName = "received_notifications")
+data class ReceivedNotificationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String?,
+    val body: String?,
+    val sender: String?,
+    val dataJson: String,
+    val receivedAt: Long
+)

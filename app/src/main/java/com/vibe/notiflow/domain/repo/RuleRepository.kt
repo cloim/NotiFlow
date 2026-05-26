@@ -2,6 +2,8 @@ package com.vibe.notiflow.domain.repo
 
 import com.vibe.notiflow.data.local.ExecutionLogEntity
 import com.vibe.notiflow.data.local.LogDao
+import com.vibe.notiflow.data.local.ReceivedNotificationDao
+import com.vibe.notiflow.data.local.ReceivedNotificationEntity
 import com.vibe.notiflow.data.local.RuleDao
 import com.vibe.notiflow.data.local.RuleEntity
 import com.vibe.notiflow.domain.model.ActionSpec
@@ -9,6 +11,7 @@ import com.vibe.notiflow.domain.model.ConditionExpression
 import com.vibe.notiflow.domain.model.ExecutionLog
 import com.vibe.notiflow.domain.model.FilterOperator
 import com.vibe.notiflow.domain.model.FilterSpec
+import com.vibe.notiflow.domain.model.ReceivedNotification
 import com.vibe.notiflow.domain.model.Rule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,13 +23,21 @@ import kotlinx.serialization.json.jsonObject
 
 private const val CONDITION_EXPRESSION_FILTER_TYPE = "condition.expression.v1"
 
-class RuleRepository(private val ruleDao: RuleDao, private val logDao: LogDao) {
+class RuleRepository(
+    private val ruleDao: RuleDao,
+    private val logDao: LogDao,
+    private val receivedNotificationDao: ReceivedNotificationDao? = null
+) {
     fun observeRules(): Flow<List<Rule>> = ruleDao.observeRules().map { it.map(RuleEntity::toDomain) }
     fun observeLogs(): Flow<List<ExecutionLog>> = logDao.observeLogs().map { it.map(ExecutionLogEntity::toDomain) }
     suspend fun getAllRules(): List<Rule> = ruleDao.getAllRules().map { it.toDomain() }
     suspend fun getRuleById(id: Long): Rule? = ruleDao.getById(id)?.toDomain()
     suspend fun getRecentLogs(limit: Int = 200): List<ExecutionLog> =
         logDao.getRecentLogs(limit).map { it.toDomain() }
+    suspend fun getRecentReceivedNotifications(limit: Int = 200): List<ReceivedNotification> =
+        requireNotNull(receivedNotificationDao) { "received notification DAO is not configured" }
+            .getRecentReceivedNotifications(limit)
+            .map { it.toDomain() }
 
     suspend fun getEnabledRulesForPackage(packageName: String): List<Rule> =
         ruleDao.getEnabledRules().map { it.toDomain() }
@@ -37,6 +48,9 @@ class RuleRepository(private val ruleDao: RuleDao, private val logDao: LogDao) {
     suspend fun updateEnabled(id: Long, enabled: Boolean) = ruleDao.updateEnabled(id, enabled)
     suspend fun deleteRule(id: Long) = ruleDao.deleteById(id)
     suspend fun insertLog(log: ExecutionLog) = logDao.insert(log.toEntity())
+    suspend fun saveReceivedNotification(notification: ReceivedNotification) =
+        requireNotNull(receivedNotificationDao) { "received notification DAO is not configured" }
+            .insert(notification.toEntity())
 }
 
 private fun RuleEntity.toDomain(): Rule {
@@ -87,3 +101,19 @@ private fun Rule.toEntity() = RuleEntity(
 
 private fun ExecutionLogEntity.toDomain() = ExecutionLog(id, ruleId, matched, result, message, executedAt, eventPackage, eventTitle)
 private fun ExecutionLog.toEntity() = ExecutionLogEntity(id, ruleId, matched, result, message, executedAt, eventPackage, eventTitle)
+private fun ReceivedNotificationEntity.toDomain() = ReceivedNotification(
+    id = id,
+    title = title,
+    body = body,
+    sender = sender,
+    data = runCatching { Json.decodeFromString<Map<String, String>>(dataJson) }.getOrDefault(emptyMap()),
+    receivedAt = receivedAt
+)
+private fun ReceivedNotification.toEntity() = ReceivedNotificationEntity(
+    id = id,
+    title = title,
+    body = body,
+    sender = sender,
+    dataJson = Json.encodeToString(data),
+    receivedAt = receivedAt
+)
