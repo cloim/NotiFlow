@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class NotiFlowFirebaseMessagingService : FirebaseMessagingService() {
     private val notifier by lazy { NotiFlowPushNotifier(this) }
@@ -20,8 +21,8 @@ class NotiFlowFirebaseMessagingService : FirebaseMessagingService() {
         val body = message.notification?.body ?: message.data["body"] ?: message.data["message"]
 
         Log.d("NotiFlow", "FCM message received: from=${message.from}")
-        scope.launch {
-            runCatching {
+        runCatching {
+            runBlocking(Dispatchers.IO) {
                 ServiceLocator.ruleRepository.saveReceivedNotification(
                     ReceivedNotification(
                         title = title,
@@ -31,9 +32,9 @@ class NotiFlowFirebaseMessagingService : FirebaseMessagingService() {
                         receivedAt = System.currentTimeMillis()
                     )
                 )
-            }.onFailure { error ->
-                Log.w("NotiFlow", "FCM message save failed", error)
             }
+        }.onFailure { error ->
+            Log.w("NotiFlow", "FCM message save failed", error)
         }
         notifier.show(title, body, message.data)
     }

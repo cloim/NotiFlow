@@ -35,6 +35,11 @@ assertIncludes(
   "FCM messages must be saved before they can be viewed."
 );
 assertIncludes(
+  "app/src/main/java/com/vibe/notiflow/notification/NotiFlowFirebaseMessagingService.kt",
+  "runBlocking(Dispatchers.IO)",
+  "FCM message persistence must finish before the short-lived messaging service can be destroyed."
+);
+assertIncludes(
   "app/src/main/java/com/vibe/notiflow/MainActivity.kt",
   "fun listReceivedNotifications",
   "The WebView bridge must expose received notifications."
@@ -48,6 +53,11 @@ assertIncludes(
   "web/src/App.jsx",
   "loadReceivedNotifications",
   "The received notifications tab must load data from the native bridge."
+);
+assertIncludes(
+  "web/src/App.jsx",
+  'if (tab !== "received") return;',
+  "The received notifications tab must reload when the user opens it."
 );
 assertIncludes(
   "web/src/App.jsx",

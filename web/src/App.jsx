@@ -1355,6 +1355,11 @@ export default function App() {
   }, [isNative, authReady, authState?.signedIn, loadPcSettingsServerStatus, refresh]);
 
   useEffect(() => {
+    if (tab !== "received") return;
+    loadReceivedNotifications();
+  }, [tab, loadReceivedNotifications]);
+
+  useEffect(() => {
     const onAuthChanged = (event) => {
       setAuthBusy(false);
       loadAuthState(event.detail);
