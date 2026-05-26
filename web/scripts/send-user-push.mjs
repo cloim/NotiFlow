@@ -119,6 +119,13 @@ async function listUserDevices({ project, uid, token }) {
 
 async function sendMessage({ project, token, fcmToken, title, body, data }) {
   const url = `https://fcm.googleapis.com/v1/projects/${project}/messages:send`;
+  const messageData = {
+    ...data,
+    title,
+    body,
+    message: body,
+  };
+
   return requestJson(url, {
     token,
     project,
@@ -126,8 +133,8 @@ async function sendMessage({ project, token, fcmToken, title, body, data }) {
     body: {
       message: {
         token: fcmToken,
-        notification: { title, body },
-        data,
+        android: { priority: "HIGH" },
+        data: messageData,
       },
     },
   });

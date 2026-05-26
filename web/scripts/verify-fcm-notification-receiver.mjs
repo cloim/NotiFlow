@@ -57,8 +57,20 @@ if (!fcmService.includes("NotiFlowPushNotifier")) {
 if (fcmService.includes("RuleEngine") || fcmService.includes("ruleEngine") || fcmService.includes("NotificationEvent")) {
   failures.push("FCM service must not route NotiFlow push messages through the rule engine");
 }
-for (const text of ["NotificationManagerCompat", "NotificationChannel", "notiflow_push", "POST_NOTIFICATIONS"]) {
+for (const text of ["NotificationManagerCompat", "NotificationChannel", "notiflow_push_alerts", "POST_NOTIFICATIONS"]) {
   if (!notifier.includes(text)) failures.push(`NotiFlowPushNotifier must include ${text}`);
+}
+for (const text of [
+  "NotificationManager.IMPORTANCE_HIGH",
+  "enableVibration(true)",
+  "RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)",
+  "AudioAttributes.USAGE_NOTIFICATION",
+  "NotificationCompat.DEFAULT_SOUND",
+  "NotificationCompat.DEFAULT_VIBRATE",
+  ".setPriority(NotificationCompat.PRIORITY_HIGH)",
+  ".setVibrate(",
+]) {
+  if (!notifier.includes(text)) failures.push(`NotiFlow push notifications must explicitly enable sound/vibration via ${text}`);
 }
 if (!notifier.includes(".setAutoCancel(false)")) {
   failures.push("NotiFlow push notifications must remain visible after the user opens NotiFlow from them");

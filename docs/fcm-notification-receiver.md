@@ -24,6 +24,7 @@ The file is ignored by git. The Gradle Google Services plugin is applied only wh
 ## Payload handling
 
 `NotiFlowFirebaseMessagingService` displays the received message through `NotiFlowPushNotifier`.
+Send NotiFlow-owned pushes as data-only FCM messages. If the FCM message includes a top-level `notification` payload, Android may display it directly while the app is in the background, which means NotiFlow does not run `onMessageReceived()` and cannot store the message in the inbox.
 
 Supported data fallbacks:
 
@@ -32,6 +33,8 @@ Supported data fallbacks:
 - Notification ID: `data.notificationId`, then `data.id.hashCode()`, then current time
 
 Android 13 and later require the `POST_NOTIFICATIONS` runtime permission. `MainActivity` requests it on startup, and the notifier skips display if the permission is not granted.
+
+NotiFlow-owned push notifications use the `notiflow_push_alerts` Android notification channel with high importance, the default notification sound, and vibration enabled. Android channel settings are user-controllable, so a user can still silence this channel from the system notification settings.
 
 ## Google Authentication
 
@@ -75,7 +78,7 @@ Firestore security rules allow users to read and write only their own `users/{ui
 
 ## Sending to a user
 
-The local sender script reads `users/{uid}/devices` from Firestore and sends an FCM v1 message to each registered device token. It uses the active `gcloud` account or `GOOGLE_OAUTH_ACCESS_TOKEN`; it does not require a service account JSON file in the repository.
+The local sender script reads `users/{uid}/devices` from Firestore and sends a high-priority data-only FCM v1 message to each registered device token. It puts `title`, `body`, and `message` inside `data` so NotiFlow receives the push, stores it in the inbox, and then displays the Android notification itself. It uses the active `gcloud` account or `GOOGLE_OAUTH_ACCESS_TOKEN`; it does not require a service account JSON file in the repository.
 
 Dry run:
 
