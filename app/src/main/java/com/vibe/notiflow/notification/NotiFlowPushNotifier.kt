@@ -43,6 +43,14 @@ class NotiFlowPushNotifier(private val context: Context) {
             launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val fullScreenIntent = Intent(context, PushFullScreenActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            context,
+            1,
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -51,9 +59,11 @@ class NotiFlowPushNotifier(private val context: Context) {
             .setStyle(NotificationCompat.BigTextStyle().bigText(resolvedBody))
             .setContentIntent(pendingIntent)
             .setAutoCancel(false)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
             .setVibrate(VIBRATION_PATTERN)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

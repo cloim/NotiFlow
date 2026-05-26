@@ -34,7 +34,7 @@ Supported data fallbacks:
 
 Android 13 and later require the `POST_NOTIFICATIONS` runtime permission. `MainActivity` requests it on startup, and the notifier skips display if the permission is not granted.
 
-NotiFlow-owned push notifications use the `notiflow_push_alerts` Android notification channel with high importance, the default notification sound, and vibration enabled. Android channel settings are user-controllable, so a user can still silence this channel from the system notification settings.
+NotiFlow-owned push notifications use the `notiflow_push_alerts` Android notification channel with high importance, the default notification sound, vibration enabled, and a full-screen intent that wakes the screen through `PushFullScreenActivity`. Android channel settings are user-controllable, so a user can still silence this channel from the system notification settings.
 
 ## Google Authentication
 
