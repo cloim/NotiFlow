@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -49,7 +51,9 @@ class NotiFlowPushNotifier(private val context: Context) {
             .setStyle(NotificationCompat.BigTextStyle().bigText(resolvedBody))
             .setContentIntent(pendingIntent)
             .setAutoCancel(false)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+            .setVibrate(VIBRATION_PATTERN)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -78,9 +82,18 @@ class NotiFlowPushNotifier(private val context: Context) {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "NotiFlow push",
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "NotiFlow가 직접 수신한 푸시 알림"
+            enableVibration(true)
+            vibrationPattern = VIBRATION_PATTERN
+            setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
         }
         manager.createNotificationChannel(channel)
     }
@@ -101,6 +114,7 @@ class NotiFlowPushNotifier(private val context: Context) {
     private fun String?.nonBlank(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
     companion object {
-        const val CHANNEL_ID = "notiflow_push"
+        const val CHANNEL_ID = "notiflow_push_alerts"
+        private val VIBRATION_PATTERN = longArrayOf(0, 250, 120, 250)
     }
 }

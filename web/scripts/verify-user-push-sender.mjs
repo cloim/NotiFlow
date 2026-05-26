@@ -31,8 +31,16 @@ for (const text of [
   "devices",
   "fcmToken",
   "messages:send",
+  'android: { priority: "HIGH" }',
 ]) {
   if (!sender.includes(text)) failures.push(`send-user-push.mjs must include ${text}`);
+}
+
+if (sender.includes("notification: { title, body }")) {
+  failures.push("send-user-push.mjs must send data-only FCM messages so NotiFlow receives and stores them in the inbox");
+}
+if (!sender.includes("title,") || !sender.includes("body,") || !sender.includes("message: body")) {
+  failures.push("send-user-push.mjs must place title and body in the data payload");
 }
 
 for (const text of [
@@ -41,6 +49,7 @@ for (const text of [
   "--uid",
   "--dry-run",
   "does not print FCM tokens",
+  "data-only",
 ]) {
   if (!docs.includes(text)) failures.push(`FCM docs must include ${text}`);
 }
