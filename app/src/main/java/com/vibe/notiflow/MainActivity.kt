@@ -1191,6 +1191,31 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
+        fun listReceivedNotifications(limit: Int): String {
+            return runCatching {
+                val safeLimit = limit.coerceIn(1, 500)
+                val notifications = runBlocking {
+                    ServiceLocator.ruleRepository.getRecentReceivedNotifications(safeLimit)
+                }
+                val items = JSONArray().apply {
+                    notifications.forEach { notification ->
+                        put(
+                            JSONObject().apply {
+                                put("id", notification.id)
+                                put("title", notification.title)
+                                put("body", notification.body)
+                                put("sender", notification.sender)
+                                put("receivedAt", notification.receivedAt)
+                                put("data", JSONObject(notification.data))
+                            }
+                        )
+                    }
+                }
+                okResponse(JSONObject().put("notifications", items))
+            }.getOrElse { errorResponse(it.message ?: "failed to load received notifications") }
+        }
+
+        @JavascriptInterface
         fun setRuleEnabled(ruleId: Long, enabled: Boolean): String {
             return runCatching {
                 runBlocking { ServiceLocator.ruleRepository.updateEnabled(ruleId, enabled) }

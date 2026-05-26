@@ -44,3 +44,12 @@ interface LogDao {
     @Insert
     suspend fun insert(entity: ExecutionLogEntity)
 }
+
+@Dao
+interface ReceivedNotificationDao {
+    @Query("SELECT * FROM received_notifications ORDER BY receivedAt DESC, id DESC LIMIT :limit")
+    suspend fun getRecentReceivedNotifications(limit: Int = 200): List<ReceivedNotificationEntity>
+
+    @Insert
+    suspend fun insert(entity: ReceivedNotificationEntity)
+}

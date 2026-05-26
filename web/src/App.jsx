@@ -430,6 +430,11 @@ const Icon = {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
     </svg>
   ),
+  Inbox: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+    </svg>
+  ),
   Settings: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1028,6 +1033,32 @@ function LogItem({ log }) {
   );
 }
 
+/* ── Received Notification Item ────────────────────────────────────── */
+function ReceivedNotificationItem({ notification }) {
+  const dataEntries = Object.entries(notification.data ?? {}).filter(([, value]) => String(value ?? "").trim());
+  return (
+    <div className="received-item">
+      <div className="received-icon"><Icon.Inbox /></div>
+      <div className="received-body">
+        <div className="received-title">{notification.title || "제목 없는 알림"}</div>
+        {notification.body && <div className="received-text">{notification.body}</div>}
+        <div className="received-meta">
+          {notification.sender && <span>{notification.sender}</span>}
+          <span>{fmtTime(notification.receivedAt)}</span>
+        </div>
+        {dataEntries.length > 0 && (
+          <div className="received-data">
+            {dataEntries.slice(0, 4).map(([key, value]) => (
+              <span key={key} className="received-chip">{key}: {String(value)}</span>
+            ))}
+            {dataEntries.length > 4 && <span className="received-chip">+{dataEntries.length - 4}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── App ────────────────────────────────────────────────────────────── */
 export default function App() {
   const native = useMemo(() => getBridge(), []);
@@ -1037,6 +1068,7 @@ export default function App() {
   const [sheetOpen, setSheet] = useState(false);
   const [rules, setRules]   = useState([]);
   const [logs, setLogs]     = useState([]);
+  const [receivedNotifications, setReceivedNotifications] = useState([]);
   const [appInfo, setAppInfo] = useState(null);
   const [permEnabled, setPermEnabled] = useState(null);
   const [busy, setBusy]     = useState(false);
@@ -1113,6 +1145,13 @@ export default function App() {
     const r = parseBridge(native.listLogs(200));
     if (r?.ok) setLogs(r.data?.logs ?? []);
     else showToast(r?.error ?? "실행 로그를 불러오지 못했습니다.", "err");
+  }, [native, showToast]);
+
+  const loadReceivedNotifications = useCallback(() => {
+    if (!native?.listReceivedNotifications) return;
+    const r = parseBridge(native.listReceivedNotifications(200));
+    if (r?.ok) setReceivedNotifications(r.data?.notifications ?? []);
+    else showToast(r?.error ?? "수신 알림을 불러오지 못했습니다.", "err");
   }, [native, showToast]);
 
   const loadPerm = useCallback(() => {
@@ -1301,8 +1340,8 @@ export default function App() {
   }, [native, showToast]);
 
   const refresh = useCallback(() => {
-    loadRules(); loadLogs(); loadPerm();
-  }, [loadRules, loadLogs, loadPerm]);
+    loadRules(); loadLogs(); loadReceivedNotifications(); loadPerm();
+  }, [loadRules, loadLogs, loadReceivedNotifications, loadPerm]);
 
   useEffect(() => {
     loadAppInfo();
@@ -1688,18 +1727,28 @@ export default function App() {
     });
   }, [logs, logFilters]);
 
-  const topbarTitle = tab === "rules" ? "규칙" : tab === "logs" ? "실행 로그" : "설정";
+  const topbarTitle = tab === "rules"
+    ? "규칙"
+    : tab === "logs"
+      ? "실행 로그"
+      : tab === "received"
+        ? "수신함"
+        : "설정";
   const topbarSubtitle = tab === "rules"
     ? `자동화 규칙 ${rules.length}개`
     : tab === "logs"
       ? `${filteredLogs.length} / ${logs.length}건`
-      : "앱 정보 및 권한";
+      : tab === "received"
+        ? `자체 수신 알림 ${receivedNotifications.length}건`
+        : "앱 정보 및 권한";
   const topbarAction = tab === "rules"
     ? refresh
     : tab === "logs"
       ? loadLogs
-      : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadAuthState(); loadPerm(); void checkForUpdate(true); };
-  const topbarBusy = tab === "rules" || tab === "logs" ? busy || ruleTransferBusy : updateBusy;
+      : tab === "received"
+        ? loadReceivedNotifications
+        : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadAuthState(); loadPerm(); void checkForUpdate(true); };
+  const topbarBusy = tab === "rules" || tab === "logs" || tab === "received" ? busy || ruleTransferBusy : updateBusy;
   const canExportRules = Boolean(native?.exportRules);
   const canImportRules = Boolean(native?.importRules);
   const loginRequired = authReady && isNative && !authState?.signedIn;
@@ -1865,6 +1914,29 @@ export default function App() {
             <div className="card">
               <div className="log-list">
                 {filteredLogs.map(log => <LogItem key={log.id} log={log} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Received Notifications Tab ───────────────────────────── */}
+      {tab === "received" && (
+        <div className="tab-content">
+          {receivedNotifications.length === 0 ? (
+            <div className="card">
+              <div className="empty">
+                <div className="empty-icon">📥</div>
+                <div className="empty-title">수신한 알림이 없습니다</div>
+                <div className="empty-desc">NotiFlow가 직접 받은 푸시 알림이 여기에 표시됩니다.</div>
+              </div>
+            </div>
+          ) : (
+            <div className="card">
+              <div className="received-list">
+                {receivedNotifications.map(notification => (
+                  <ReceivedNotificationItem key={notification.id} notification={notification} />
+                ))}
               </div>
             </div>
           )}
@@ -2191,6 +2263,7 @@ export default function App() {
         {[
           { id: "rules",    label: "규칙",      Icon: Icon.Bell },
           { id: "logs",     label: "로그",      Icon: Icon.Log },
+          { id: "received", label: "수신함",    Icon: Icon.Inbox },
           { id: "settings", label: "설정",      Icon: Icon.Settings },
         ].map(({ id, label, Icon: I }) => (
           <button
