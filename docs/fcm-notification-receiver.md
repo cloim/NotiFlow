@@ -36,6 +36,8 @@ Android 13 and later require the `POST_NOTIFICATIONS` runtime permission. `MainA
 
 NotiFlow-owned push notifications use the `notiflow_push_alerts` Android notification channel with high importance, the default notification sound, vibration enabled, and a full-screen intent that wakes the screen through `PushFullScreenActivity`. Android channel settings are user-controllable, so a user can still silence this channel from the system notification settings.
 
+If an external sender still sends a top-level FCM `notification` payload, Android may auto-display it without calling `onMessageReceived()` while the app is in the background. For that legacy case, the notification listener persists only NotiFlow's own Firebase auto-displayed notifications (`packageName == NotiFlow` and `FCM-Notification:*` tag) as a fallback. It does not persist other apps' listener notifications into the inbox.
+
 ## Google Authentication
 
 NotiFlow uses Firebase Authentication with Google Sign-In through Android Credential Manager. The app exposes login state to the WebView through the native bridge and shows the current Firebase user in Settings.
