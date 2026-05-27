@@ -40,6 +40,31 @@ assertIncludes(
   "FCM message persistence must finish before the short-lived messaging service can be destroyed."
 );
 assertIncludes(
+  "app/src/main/res/values/strings.xml",
+  "<string name=\"fcm_default_notification_channel_id\">notiflow_push_alerts</string>",
+  "FCM notification payload fallback must use the same NotiFlow-owned alert channel."
+);
+assertIncludes(
+  "app/src/main/java/com/vibe/notiflow/notification/NotiFlowNotificationListenerService.kt",
+  "saveOwnFcmNotificationIfNeeded",
+  "Notification payloads auto-displayed by Firebase must be persisted when they belong to NotiFlow itself."
+);
+assertIncludes(
+  "app/src/main/java/com/vibe/notiflow/notification/NotiFlowNotificationListenerService.kt",
+  "sbn.packageName != packageName",
+  "The listener fallback must not persist notifications from other apps."
+);
+assertIncludes(
+  "app/src/main/java/com/vibe/notiflow/notification/NotiFlowNotificationListenerService.kt",
+  "sbn.tag?.startsWith(\"FCM-Notification:\")",
+  "The listener fallback must be limited to Firebase auto-displayed NotiFlow notifications."
+);
+assertIncludes(
+  "app/src/main/java/com/vibe/notiflow/notification/NotiFlowNotificationListenerService.kt",
+  "saveReceivedNotification",
+  "The listener fallback must save NotiFlow-owned Firebase notifications to the inbox."
+);
+assertIncludes(
   "app/src/main/java/com/vibe/notiflow/MainActivity.kt",
   "fun listReceivedNotifications",
   "The WebView bridge must expose received notifications."
