@@ -24,6 +24,7 @@
     "test:pc-settings-server": "node scripts/verify-pc-settings-server.mjs",
     "test:pc-rule-form": "node scripts/verify-pc-rule-form-parity.mjs",
     "test:rule-transfer": "node scripts/verify-rule-transfer.mjs",
+    "test:rule-copy": "node scripts/verify-rule-copy.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "send:user-push": "node scripts/send-user-push.mjs"
   },

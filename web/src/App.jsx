@@ -450,6 +450,11 @@ const Icon = {
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
     </svg>
   ),
+  Copy: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  ),
   Pause: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
@@ -494,7 +499,7 @@ function Toast({ toast }) {
 }
 
 /* ── Rule Card ──────────────────────────────────────────────────────── */
-function RuleCard({ rule, onEdit, onToggle, onDelete, busy }) {
+function RuleCard({ rule, onEdit, onToggle, onDelete, onCopy, busy }) {
   const condCount = Array.isArray(rule?.conditionExpression?.rows)
     ? rule.conditionExpression.rows.length
     : (rule.filters ?? []).filter(f => f.type !== "package.equals").length;
@@ -522,6 +527,9 @@ function RuleCard({ rule, onEdit, onToggle, onDelete, busy }) {
       <div className="rule-btns">
         <button className="rule-btn edit" onClick={() => onEdit(rule)} disabled={busy}>
           <Icon.Edit /> 수정
+        </button>
+        <button className="rule-btn copy" onClick={() => onCopy(rule)} disabled={busy}>
+          <Icon.Copy /> 복사
         </button>
         <button
           className={`rule-btn ${isEnabled ? "on" : "off"}`}
@@ -1698,6 +1706,19 @@ export default function App() {
     } finally { setBusy(false); }
   }, [native, showToast, loadRules]);
 
+  const copyRule = useCallback((rule) => {
+    if (!native?.copyRule) {
+      showToast("앱 연결 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = parseBridge(native.copyRule(rule.id));
+      if (r?.ok) { showToast("규칙을 복사했습니다."); loadRules(); }
+      else showToast(r?.error ?? "규칙을 복사하지 못했습니다.", "err");
+    } finally { setBusy(false); }
+  }, [native, showToast, loadRules]);
+
   const deleteRule = useCallback((ruleId) => {
     if (!window.confirm(`규칙 #${ruleId}을 삭제할까요?`)) return;
     setBusy(true);
@@ -1856,6 +1877,7 @@ export default function App() {
                 onEdit={openEdit}
                 onToggle={toggleRule}
                 onDelete={deleteRule}
+                onCopy={copyRule}
                 busy={busy}
               />
             ))

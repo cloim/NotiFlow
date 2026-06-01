@@ -376,6 +376,11 @@ class MainActivity : ComponentActivity() {
         return "$packageShortName - $summary"
     }
 
+    private fun copiedRuleName(name: String): String {
+        val base = name.trim().ifBlank { "규칙" }
+        return "$base 복사본"
+    }
+
     private fun jsonValue(value: String): JsonObject = buildJsonObject { put("value", value) }
 
     private fun okResponse(payload: JSONObject = JSONObject()): String {
@@ -1226,6 +1231,23 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }.getOrElse { errorResponse(it.message ?: "failed to update rule") }
+        }
+
+        @JavascriptInterface
+        fun copyRule(ruleId: Long): String {
+            return runCatching {
+                if (ruleId <= 0) return errorResponse("ruleId is required")
+                val existing = runBlocking { ServiceLocator.ruleRepository.getRuleById(ruleId) }
+                    ?: return errorResponse("rule not found")
+                val copiedRule = existing.copy(id = 0, name = copiedRuleName(existing.name))
+                val copiedRuleId = runBlocking { ServiceLocator.ruleRepository.upsertRule(copiedRule) }
+                okResponse(
+                    JSONObject().apply {
+                        put("ruleId", copiedRuleId)
+                        put("sourceRuleId", ruleId)
+                    }
+                )
+            }.getOrElse { errorResponse(it.message ?: "failed to copy rule") }
         }
 
         @JavascriptInterface

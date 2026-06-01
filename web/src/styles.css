@@ -387,6 +387,7 @@ body {
 .rule-btn:not(:last-child) { border-right: 1px solid var(--border); }
 .rule-btn:active { background: rgba(255,255,255,.04); }
 .rule-btn.edit:active   { color: var(--accent-hi); }
+.rule-btn.copy:active   { color: var(--accent-hi); }
 .rule-btn.on:active     { color: var(--amber); }
 .rule-btn.off:active    { color: var(--green); }
 .rule-btn.del:active    { color: var(--red); }
