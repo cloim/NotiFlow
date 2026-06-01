@@ -1196,11 +1196,20 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
-        fun listReceivedNotifications(limit: Int): String {
+        fun listReceivedNotifications(inputJson: String): String {
             return runCatching {
-                val safeLimit = limit.coerceIn(1, 500)
+                val input = JSONObject(inputJson)
+                val keyword = input.optString("keyword").trim()
+                val from = if (input.has("from")) input.optLong("from") else null
+                val to = if (input.has("to")) input.optLong("to") else null
+                val safeLimit = input.optInt("limit", 200).coerceIn(1, 500)
                 val notifications = runBlocking {
-                    ServiceLocator.ruleRepository.getRecentReceivedNotifications(safeLimit)
+                    ServiceLocator.ruleRepository.searchReceivedNotifications(
+                        limit = safeLimit,
+                        from = from,
+                        to = to,
+                        keyword = keyword
+                    )
                 }
                 val items = JSONArray().apply {
                     notifications.forEach { notification ->

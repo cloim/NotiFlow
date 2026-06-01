@@ -38,6 +38,15 @@ class RuleRepository(
         requireNotNull(receivedNotificationDao) { "received notification DAO is not configured" }
             .getRecentReceivedNotifications(limit)
             .map { it.toDomain() }
+    suspend fun searchReceivedNotifications(
+        limit: Int = 200,
+        from: Long? = null,
+        to: Long? = null,
+        keyword: String = ""
+    ): List<ReceivedNotification> =
+        requireNotNull(receivedNotificationDao) { "received notification DAO is not configured" }
+            .searchReceivedNotifications(limit, from, to, keyword)
+            .map { it.toDomain() }
 
     suspend fun getEnabledRulesForPackage(packageName: String): List<Rule> =
         ruleDao.getEnabledRules().map { it.toDomain() }

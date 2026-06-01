@@ -50,6 +50,29 @@ interface ReceivedNotificationDao {
     @Query("SELECT * FROM received_notifications ORDER BY receivedAt DESC, id DESC LIMIT :limit")
     suspend fun getRecentReceivedNotifications(limit: Int = 200): List<ReceivedNotificationEntity>
 
+    @Query(
+        """
+        SELECT * FROM received_notifications
+        WHERE (:from IS NULL OR receivedAt >= :from)
+          AND (:to IS NULL OR receivedAt <= :to)
+          AND (
+            :keyword = ''
+            OR title LIKE '%' || :keyword || '%'
+            OR body LIKE '%' || :keyword || '%'
+            OR sender LIKE '%' || :keyword || '%'
+            OR dataJson LIKE '%' || :keyword || '%'
+          )
+        ORDER BY receivedAt DESC, id DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchReceivedNotifications(
+        limit: Int = 200,
+        from: Long? = null,
+        to: Long? = null,
+        keyword: String = ""
+    ): List<ReceivedNotificationEntity>
+
     @Insert
     suspend fun insert(entity: ReceivedNotificationEntity)
 }
