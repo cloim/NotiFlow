@@ -77,17 +77,17 @@ assertIncludes(
 assertIncludes(
   "web/src/App.jsx",
   "loadReceivedNotifications",
-  "The received notifications tab must load data from the native bridge."
-);
-assertIncludes(
-  "web/src/App.jsx",
-  'if (tab !== "received") return;',
-  "The received notifications tab must reload when the user opens it."
+  "The received notifications tab must be able to load data from the native bridge."
 );
 assertIncludes(
   "web/src/App.jsx",
   "ReceivedNotificationItem",
   "The UI must render each received notification."
 );
+
+const app = read("web/src/App.jsx");
+if (app.includes('if (tab !== "received") return;')) {
+  throw new Error("The received notifications tab must not auto-load when the user opens it.");
+}
 
 console.log("Received notification tab verification passed.");

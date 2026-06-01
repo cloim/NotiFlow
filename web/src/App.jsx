@@ -417,6 +417,16 @@ function fmtBytes(bytes) {
   if (n < 1024 * 1024) return `${Math.round(n / 1024)}KB`;
   return `${(n / (1024 * 1024)).toFixed(1)}MB`;
 }
+function receivedPreview(text, max = 86) {
+  const value = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!value) return "내용 없음";
+  return value.length > max ? `${value.slice(0, max).trim()}...` : value;
+}
+function dateTimeLocalToMillis(value) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
 
 /* ── Icons ──────────────────────────────────────────────────────────── */
 const Icon = {
@@ -1042,28 +1052,58 @@ function LogItem({ log }) {
 }
 
 /* ── Received Notification Item ────────────────────────────────────── */
-function ReceivedNotificationItem({ notification }) {
-  const dataEntries = Object.entries(notification.data ?? {}).filter(([, value]) => String(value ?? "").trim());
+function ReceivedNotificationItem({ notification, onOpen }) {
   return (
-    <div className="received-item">
-      <div className="received-icon"><Icon.Inbox /></div>
+    <button className="received-item" onClick={() => onOpen(notification)}>
       <div className="received-body">
         <div className="received-title">{notification.title || "제목 없는 알림"}</div>
-        {notification.body && <div className="received-text">{notification.body}</div>}
-        <div className="received-meta">
-          {notification.sender && <span>{notification.sender}</span>}
-          <span>{fmtTime(notification.receivedAt)}</span>
-        </div>
-        {dataEntries.length > 0 && (
-          <div className="received-data">
-            {dataEntries.slice(0, 4).map(([key, value]) => (
-              <span key={key} className="received-chip">{key}: {String(value)}</span>
-            ))}
-            {dataEntries.length > 4 && <span className="received-chip">+{dataEntries.length - 4}</span>}
-          </div>
-        )}
+        <div className="received-item-preview">{receivedPreview(notification.body)}</div>
       </div>
-    </div>
+    </button>
+  );
+}
+
+function ReceivedNotificationDetailSheet({ notification, onClose }) {
+  const open = Boolean(notification);
+  const dataEntries = Object.entries(notification?.data ?? {}).filter(([, value]) => String(value ?? "").trim());
+  return (
+    <>
+      <div className={`backdrop${open ? " open" : ""}`} onClick={onClose} />
+      <div className={`sheet received-detail-sheet${open ? " open" : ""}`}>
+        <div className="sheet-grab" />
+        <div className="sheet-hdr">
+          <span className="sheet-title">수신 알림 상세</span>
+          <button className="icon-btn" onClick={onClose}><Icon.X /></button>
+        </div>
+        <div className="sheet-body">
+          <div className="received-detail-row">
+            <span className="field-lbl">타이틀</span>
+            <div className="received-title">{notification?.title || "제목 없는 알림"}</div>
+          </div>
+          <div className="received-detail-row">
+            <span className="field-lbl">내용</span>
+            <div className="received-text">{notification?.body || "내용 없음"}</div>
+          </div>
+          <div className="received-detail-row">
+            <span className="field-lbl">메타</span>
+            <div className="received-meta">
+              {notification?.sender && <span>{notification.sender}</span>}
+              {notification?.receivedAt && <span>{fmtTime(notification.receivedAt)}</span>}
+            </div>
+          </div>
+          {dataEntries.length > 0 && (
+            <div className="received-detail-row">
+              <span className="field-lbl">데이터</span>
+              <div className="received-data">
+                {dataEntries.map(([key, value]) => (
+                  <span key={key} className="received-chip">{key}: {String(value)}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1077,6 +1117,9 @@ export default function App() {
   const [rules, setRules]   = useState([]);
   const [logs, setLogs]     = useState([]);
   const [receivedNotifications, setReceivedNotifications] = useState([]);
+  const [receivedFilters, setReceivedFilters] = useState({ keyword: "", from: "", to: "" });
+  const [receivedHasSearched, setReceivedHasSearched] = useState(false);
+  const [selectedReceivedNotification, setSelectedReceivedNotification] = useState(null);
   const [appInfo, setAppInfo] = useState(null);
   const [permEnabled, setPermEnabled] = useState(null);
   const [busy, setBusy]     = useState(false);
@@ -1155,12 +1198,42 @@ export default function App() {
     else showToast(r?.error ?? "실행 로그를 불러오지 못했습니다.", "err");
   }, [native, showToast]);
 
-  const loadReceivedNotifications = useCallback(() => {
-    if (!native?.listReceivedNotifications) return;
-    const r = parseBridge(native.listReceivedNotifications(200));
-    if (r?.ok) setReceivedNotifications(r.data?.notifications ?? []);
-    else showToast(r?.error ?? "수신 알림을 불러오지 못했습니다.", "err");
-  }, [native, showToast]);
+  const loadReceivedNotifications = useCallback((filters = receivedFilters) => {
+    if (!native?.listReceivedNotifications) {
+      showToast("앱 연결 기능을 사용할 수 없습니다.", "err");
+      return;
+    }
+    const from = dateTimeLocalToMillis(filters.from);
+    const to = dateTimeLocalToMillis(filters.to);
+    if (from !== null && to !== null && from > to) {
+      showToast("시작 시간이 종료 시간보다 늦습니다.", "err");
+      return;
+    }
+
+    const payload = {
+      limit: 200,
+      keyword: filters.keyword.trim(),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    };
+
+    setBusy(true);
+    try {
+      const r = parseBridge(native.listReceivedNotifications(JSON.stringify(payload)));
+      if (r?.ok) {
+        setReceivedNotifications(r.data?.notifications ?? []);
+        setReceivedHasSearched(true);
+      } else {
+        showToast(r?.error ?? "수신 알림을 불러오지 못했습니다.", "err");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [native, receivedFilters, showToast]);
+
+  const searchReceivedNotifications = useCallback(() => {
+    loadReceivedNotifications(receivedFilters);
+  }, [loadReceivedNotifications, receivedFilters]);
 
   const loadPerm = useCallback(() => {
     if (!native?.isNotificationListenerEnabled) return;
@@ -1348,8 +1421,8 @@ export default function App() {
   }, [native, showToast]);
 
   const refresh = useCallback(() => {
-    loadRules(); loadLogs(); loadReceivedNotifications(); loadPerm();
-  }, [loadRules, loadLogs, loadReceivedNotifications, loadPerm]);
+    loadRules(); loadLogs(); loadPerm();
+  }, [loadRules, loadLogs, loadPerm]);
 
   useEffect(() => {
     loadAppInfo();
@@ -1361,11 +1434,6 @@ export default function App() {
     loadPcSettingsServerStatus();
     refresh();
   }, [isNative, authReady, authState?.signedIn, loadPcSettingsServerStatus, refresh]);
-
-  useEffect(() => {
-    if (tab !== "received") return;
-    loadReceivedNotifications();
-  }, [tab, loadReceivedNotifications]);
 
   useEffect(() => {
     const onAuthChanged = (event) => {
@@ -1772,7 +1840,7 @@ export default function App() {
     : tab === "logs"
       ? loadLogs
       : tab === "received"
-        ? loadReceivedNotifications
+        ? searchReceivedNotifications
         : () => { loadAppInfo(); loadPcSettingsServerStatus(); loadAuthState(); loadPerm(); void checkForUpdate(true); };
   const topbarBusy = tab === "rules" || tab === "logs" || tab === "received" ? busy || ruleTransferBusy : updateBusy;
   const canExportRules = Boolean(native?.exportRules);
@@ -1950,19 +2018,84 @@ export default function App() {
       {/* ── Received Notifications Tab ───────────────────────────── */}
       {tab === "received" && (
         <div className="tab-content">
-          {receivedNotifications.length === 0 ? (
+          <div className="received-search-card">
+            <div className="field">
+              <label className="field-lbl">키워드</label>
+              <input
+                className="field-input"
+                value={receivedFilters.keyword}
+                onChange={(e) => setReceivedFilters((current) => ({ ...current, keyword: e.target.value }))}
+                placeholder="타이틀, 내용, 발신자, 데이터 검색"
+              />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label className="field-lbl">시작</label>
+                <input
+                  className="field-input"
+                  type="datetime-local"
+                  value={receivedFilters.from}
+                  onChange={(e) => setReceivedFilters((current) => ({ ...current, from: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label className="field-lbl">종료</label>
+                <input
+                  className="field-input"
+                  type="datetime-local"
+                  value={receivedFilters.to}
+                  onChange={(e) => setReceivedFilters((current) => ({ ...current, to: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="received-search-actions">
+              <button
+                className="btn btn-primary"
+                onClick={searchReceivedNotifications}
+                disabled={busy}
+              >
+                조회
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setReceivedFilters({ keyword: "", from: "", to: "" });
+                  setReceivedNotifications([]);
+                  setReceivedHasSearched(false);
+                  setSelectedReceivedNotification(null);
+                }}
+                disabled={busy}
+              >
+                초기화
+              </button>
+            </div>
+          </div>
+
+          {!receivedHasSearched ? (
             <div className="card">
               <div className="empty">
                 <div className="empty-icon">📥</div>
-                <div className="empty-title">수신한 알림이 없습니다</div>
-                <div className="empty-desc">NotiFlow가 직접 받은 푸시 알림이 여기에 표시됩니다.</div>
+                <div className="empty-title">조회 대기 중</div>
+                <div className="empty-desc">검색 조건을 입력한 뒤 조회를 누르세요.</div>
+              </div>
+            </div>
+          ) : receivedNotifications.length === 0 ? (
+            <div className="card">
+              <div className="empty">
+                <div className="empty-icon">📥</div>
+                <div className="empty-title">조회 결과가 없습니다</div>
+                <div className="empty-desc">기간이나 키워드 조건을 바꿔 다시 조회해 보세요.</div>
               </div>
             </div>
           ) : (
             <div className="card">
               <div className="received-list">
                 {receivedNotifications.map(notification => (
-                  <ReceivedNotificationItem key={notification.id} notification={notification} />
+                  <ReceivedNotificationItem
+                    key={notification.id}
+                    notification={notification}
+                    onOpen={setSelectedReceivedNotification}
+                  />
                 ))}
               </div>
             </div>
@@ -2260,6 +2393,11 @@ export default function App() {
         onClearAll={() => setSelectedExportRuleIds(new Set())}
         onIncludeSecretsChange={setIncludeExportSecrets}
         onExport={exportSelectedRules}
+      />
+
+      <ReceivedNotificationDetailSheet
+        notification={selectedReceivedNotification}
+        onClose={() => setSelectedReceivedNotification(null)}
       />
 
       <PackageLoadingDialog open={isPackageLoadingDialogOpen} />
