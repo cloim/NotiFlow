@@ -422,10 +422,23 @@ function receivedPreview(text, max = 86) {
   if (!value) return "내용 없음";
   return value.length > max ? `${value.slice(0, max).trim()}...` : value;
 }
+function dateToDateTimeLocalValue(value) {
+  const date = new Date(Number(value));
+  if (!Number.isFinite(date.getTime())) return "";
+  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localTime.toISOString().slice(0, 16);
+}
 function dateTimeLocalToMillis(value) {
   if (!value) return null;
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : null;
+}
+function defaultReceivedFilters() {
+  return {
+    keyword: "",
+    from: dateToDateTimeLocalValue(Date.now() - 30 * 60 * 1000),
+    to: "",
+  };
 }
 
 /* ── Icons ──────────────────────────────────────────────────────────── */
@@ -1117,7 +1130,7 @@ export default function App() {
   const [rules, setRules]   = useState([]);
   const [logs, setLogs]     = useState([]);
   const [receivedNotifications, setReceivedNotifications] = useState([]);
-  const [receivedFilters, setReceivedFilters] = useState({ keyword: "", from: "", to: "" });
+  const [receivedFilters, setReceivedFilters] = useState(defaultReceivedFilters);
   const [receivedHasSearched, setReceivedHasSearched] = useState(false);
   const [selectedReceivedNotification, setSelectedReceivedNotification] = useState(null);
   const [appInfo, setAppInfo] = useState(null);
@@ -2059,7 +2072,7 @@ export default function App() {
               <button
                 className="btn btn-ghost"
                 onClick={() => {
-                  setReceivedFilters({ keyword: "", from: "", to: "" });
+                  setReceivedFilters(defaultReceivedFilters());
                   setReceivedNotifications([]);
                   setReceivedHasSearched(false);
                   setSelectedReceivedNotification(null);

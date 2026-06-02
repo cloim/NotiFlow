@@ -42,6 +42,10 @@ for (const text of [
 
 for (const text of [
   "receivedFilters",
+  "function defaultReceivedFilters()",
+  "Date.now() - 30 * 60 * 1000",
+  "from: dateToDateTimeLocalValue",
+  "useState(defaultReceivedFilters)",
   "receivedHasSearched",
   "selectedReceivedNotification",
   "function ReceivedNotificationDetailSheet",
