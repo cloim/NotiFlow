@@ -1,5 +1,6 @@
 package com.vibe.notiflow.notification
 
+import android.app.Notification
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -34,6 +35,16 @@ class NotiFlowNotificationListenerService : NotificationListenerService() {
         val text = extras?.getCharSequence("android.text")?.toString()
 
         if (saveOwnFcmNotificationIfNeeded(sbn, title, text)) return
+        if (!SourceNotificationPolicy.shouldProcessForRules(
+                sourcePackageName = sbn.packageName,
+                ownPackageName = packageName,
+                isOngoing = n.flags and Notification.FLAG_ONGOING_EVENT != 0,
+                isGroupSummary = n.flags and Notification.FLAG_GROUP_SUMMARY != 0
+            )
+        ) {
+            Log.d("NotiFlow", "Skipping source notification: pkg=${sbn.packageName}")
+            return
+        }
 
         val event = NotificationEvent(
             packageName = sbn.packageName,
