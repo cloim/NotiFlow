@@ -41,3 +41,5 @@ google-services*.json
 web/node_modules/
 web/dist/
 notiflow_ui.xml
+
+docs/
