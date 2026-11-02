@@ -431,6 +431,7 @@ export default function RuleEditor() {
                 </Field>
                 <div className="flex flex-wrap gap-2">
                   {[
+                    "url",
                     "source",
                     "mimeType",
                     "title",
@@ -454,6 +455,9 @@ export default function RuleEditor() {
                   ))}
                 </div>
                 <p className="text-xs leading-6 text-muted">
+                  공유 링크 주소는 {"{{url}}"}, 입력 유형은 {"{{source}}"}로
+                  전송합니다
+                  <br />
                   파일은 이름, MIME 타입, 크기와 Base64 본문으로 전송합니다
                 </p>
                 <Field

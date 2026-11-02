@@ -12,12 +12,12 @@ if (file("google-services.json").exists()) {
 val androidVersionName = (project.findProperty("androidVersionName") as String?)
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
-    ?: "2.1.0"
+    ?: "2.1.1"
 val androidVersionCode = (project.findProperty("androidVersionCode") as String?)
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
     ?.toInt()
-    ?: 30
+    ?: 31
 
 fun signingProperty(name: String): String? =
     (project.findProperty(name) as String?)?.trim()?.takeIf { it.isNotEmpty() }

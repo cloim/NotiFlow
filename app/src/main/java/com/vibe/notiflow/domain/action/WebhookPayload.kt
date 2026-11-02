@@ -1,6 +1,7 @@
 package com.vibe.notiflow.domain.action
 
 import com.vibe.notiflow.domain.model.NotificationEvent
+import com.vibe.notiflow.domain.model.SharedContent
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
@@ -18,10 +19,11 @@ object WebhookPayload {
             "postedAt" to event.postedAt.toString(),
             "extras" to JSONObject(event.extras).toString(),
             "source" to JSONObject.quote(event.source),
-            "mimeType" to (event.mimeType?.let(JSONObject::quote) ?: "null"),
+            "url" to (SharedContent.url(event)?.let(JSONObject::quote) ?: "null"),
+            "mimeType" to (SharedContent.mimeType(event)?.let(JSONObject::quote) ?: "null"),
             "attachments" to Json.encodeToString(event.attachments)
         )
-        val rendered = Regex("\\{\\{([^}]+)}}").replace(template) { match ->
+        val rendered = Regex("\\{\\{([^}]+)\\}\\}").replace(template) { match ->
             values[match.groupValues[1]] ?: error("지원하는 본문 변수를 선택해 주세요: ${match.value}")
         }
         val tokener = JSONTokener(rendered)

@@ -46,3 +46,19 @@ test("editing preserves the original token until explicitly changed", () => {
   assert.equal(Object.hasOwn(toPayload(form).webhook, "token"), false);
   assert.equal(toPayload({ ...form, token: "" }).webhook.token, "");
 });
+
+test("shared link payload accepts both source and explicit URL variables", () => {
+  for (const variable of ["source", "url"]) {
+    const form = {
+      ...ruleForm(),
+      name: "공유 링크 수집",
+      source: "share",
+      url: "https://example.com/api/v1/collections/example/documents/url",
+      method: "POST",
+      payloadTemplate: `{ "url": {{${variable}}} }`,
+    };
+    assert.deepEqual(validateForm(form), {});
+    assert.equal(toPayload(form).webhook.payloadTemplate, form.payloadTemplate);
+    assert.equal(toPayload(form).webhook.method, "POST");
+  }
+});

@@ -6,7 +6,8 @@ export const conditionTypes = [
 ];
 export const mimeTypes = [
   ["*/*", "모든 콘텐츠"],
-  ["text/*", "텍스트와 링크"],
+  ["text/plain", "텍스트"],
+  ["text/uri-list", "링크"],
   ["image/*", "이미지"],
   ["application/pdf", "PDF"],
   ["video/*", "동영상"],
@@ -87,7 +88,7 @@ export function validateForm(form) {
   if (form.payloadTemplate.trim()) {
     try {
       const rendered = form.payloadTemplate.replace(
-        /\{\{([^}]+)}}/g,
+        /\{\{([^}]+)\}\}/g,
         (_, key) => {
           if (
             ![
@@ -97,6 +98,7 @@ export function validateForm(form) {
               "postedAt",
               "extras",
               "source",
+              "url",
               "mimeType",
               "attachments",
             ].includes(key)

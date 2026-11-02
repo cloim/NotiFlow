@@ -40,6 +40,8 @@ Node.js 22.12 이상, JDK 17 이상, Android SDK 35가 필요합니다. 기존 R
 
 규칙, 공유 수신 또는 화면을 변경한 뒤 아래 순서로 검증합니다. Windows의 긴 명령은 `~/.agents/scripts/maintenance/run_job.py`에 제출하고 최종 종료 상태를 확인합니다.
 
+Windows에서는 `uv run python scripts/verify-template-regex.py`도 실행합니다. 실제 Kotlin 템플릿 정규식을 Windows ICU로 컴파일하고 변수 매칭을 검사합니다. JVM과 Android ICU의 중괄호 해석 차이로 발생한 저장 오류를 재현하고, 수정된 패턴의 호환성을 확인하는 검사입니다. 앱 데이터나 외부 서버에 접근하지 않습니다.
+
 ```text
 cd web
 npm test
@@ -73,6 +75,10 @@ GitHub Actions 대신 로컬에서 빌드, 서명 검증, APK 보관과 릴리�
 ## 웹훅 본문
 
 본문 템플릿을 비우면 전체 이벤트를 전송합니다. 변수는 JSON 값으로 치환하므로 추가 따옴표를 붙이지 않습니다.
+
+공유한 링크를 URL 수집 API에 보내려면 `링크` 콘텐츠 타입과 `{"url": {{url}}}` 본문을 사용합니다. `{{source}}`는 공유 URL이 아니라 입력 유형(`share` 또는 `notification`)입니다. `{{text}}`는 공유 본문 전체이며 `{{url}}`은 본문의 독립된 줄에 있는 첫 HTTP(S) 주소입니다. 링크가 없거나 파일 공유와 알림 이벤트인 경우 `{{url}}`은 `null`입니다.
+
+`텍스트`는 `text/plain`, `링크`는 `text/uri-list`로 구분합니다. 브라우저가 URL을 `text/plain`으로 공유해도 URL 단독 또는 제목 다음 줄에 HTTP(S) 주소가 있으면 링크로 인식합니다. 직접 입력한 `text/*` 조건은 기존처럼 두 타입을 모두 포함합니다.
 
 ```json
 {

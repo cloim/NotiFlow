@@ -4,13 +4,16 @@ import { X, ChevronDown } from "lucide-react";
 
 export function SelectControl({ children, className = "", ...props }) {
   return (
-    <span className={`relative block min-w-0 ${className}`}>
+    <span
+      className={`relative flex w-full min-w-0 self-start items-center ${className}`}
+    >
       <select {...props} className="field appearance-none pr-9">
         {children}
       </select>
       <ChevronDown
         size={16}
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+        aria-hidden="true"
+        className="pointer-events-none absolute right-3 text-muted"
       />
     </span>
   );

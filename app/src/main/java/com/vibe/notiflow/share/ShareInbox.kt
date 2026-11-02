@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.vibe.notiflow.domain.model.NotificationEvent
 import com.vibe.notiflow.domain.model.SharedAttachment
+import com.vibe.notiflow.domain.model.SharedContent
 import java.io.File
 import java.util.UUID
 import kotlinx.serialization.encodeToString
@@ -60,7 +61,7 @@ class ShareInbox(private val context: Context) {
             ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
         require(attachments.isNotEmpty() || !text.isNullOrBlank()) { "공유할 내용을 찾지 못했어요" }
         require((text?.length ?: 0) <= 200_000) { "공유 텍스트는 20만 자까지 지원해요" }
-        val event = NotificationEvent(
+        val received = NotificationEvent(
             packageName = "share",
             title = intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: attachments.firstOrNull()?.name ?: "공유 콘텐츠",
             text = text,
@@ -70,6 +71,7 @@ class ShareInbox(private val context: Context) {
             attachments = attachments,
             eventId = UUID.randomUUID().toString()
         )
+        val event = received.copy(mimeType = SharedContent.mimeType(received))
         val temporary = File(directory, "${event.eventId}.tmp")
         temporary.writeText(Json.encodeToString(event))
         check(temporary.renameTo(File(directory, "${event.eventId}.json"))) { "공유 콘텐츠를 다시 보내 주세요" }

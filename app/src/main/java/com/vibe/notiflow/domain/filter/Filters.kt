@@ -1,6 +1,7 @@
 package com.vibe.notiflow.domain.filter
 
 import com.vibe.notiflow.domain.model.NotificationEvent
+import com.vibe.notiflow.domain.model.SharedContent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -56,7 +57,7 @@ class MimeTypeFilter : EventFilter {
     override fun matches(event: NotificationEvent, config: JsonObject): Boolean {
         if (event.source != "share") return false
         val pattern = config["value"]?.jsonPrimitive?.contentOrNull?.lowercase() ?: return false
-        val types = event.attachments.map { it.mimeType } .ifEmpty { listOfNotNull(event.mimeType) }
+        val types = event.attachments.map { it.mimeType }.ifEmpty { listOfNotNull(SharedContent.mimeType(event)) }
         return types.any { raw ->
             val mime = raw.substringBefore(';').trim().lowercase()
             pattern == "*/*" || mime == pattern ||
