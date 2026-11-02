@@ -46,7 +46,7 @@ export function ErrorState({ error, retry }) {
   );
 }
 export function RuleList() {
-  const { rules, loading, error, refresh, toggle } = useFlow();
+  const { rules, pendingRule, loading, error, refresh, toggle } = useFlow();
   return (
     <div
       data-ui-audit-scroll-root
@@ -107,6 +107,7 @@ export function RuleList() {
                   role="switch"
                   aria-checked={rule.enabled}
                   aria-label={`${rule.name} 활성화`}
+                  disabled={pendingRule !== null}
                   onClick={() => toggle(rule)}
                   className={`relative mt-1 h-7 w-12 shrink-0 rounded-full border-4 border-transparent transition ${rule.enabled ? "bg-primary" : "bg-line"}`}
                 >
@@ -141,7 +142,7 @@ export function RuleList() {
 export function RuleDetail() {
   const { id } = useParams(),
     navigate = useNavigate(),
-    { rules, loading, toggle, remove, notify } = useFlow(),
+    { rules, pendingRule, loading, toggle, remove, notify } = useFlow(),
     [deleting, setDeleting] = useState(false);
   const rule = rules.find((r) => String(r.id) === id),
     close = useCallback(() => setDeleting(false), []);
@@ -187,13 +188,18 @@ export function RuleDetail() {
               <Pencil size={17} />
               규칙 수정
             </Link>
-            <button className="btn-secondary" onClick={() => toggle(rule)}>
+            <button
+              className="btn-secondary"
+              disabled={pendingRule !== null}
+              onClick={() => toggle(rule)}
+            >
               {rule.enabled ? <Pause size={17} /> : <Play size={17} />}
               {rule.enabled ? "일시정지" : "규칙 켜기"}
             </button>
             <button
               className="icon-btn ml-auto text-danger"
               aria-label="규칙 삭제"
+              disabled={pendingRule !== null}
               onClick={() => setDeleting(true)}
             >
               <Trash2 size={19} />
@@ -278,9 +284,10 @@ export function RuleDetail() {
               </button>
               <button
                 className="btn-danger"
-                onClick={() => {
+                disabled={pendingRule !== null}
+                onClick={async () => {
                   try {
-                    remove(rule.id);
+                    await remove(rule.id);
                     navigate("/rules");
                   } catch (err) {
                     notify(err.message, "error");

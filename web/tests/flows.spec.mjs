@@ -5,32 +5,7 @@ import { runLayoutAudit } from "../scripts/audit-layout.mjs";
 const out = path.resolve("../docs/validation");
 mkdirSync(out, { recursive: true });
 
-async function checkKoreanWords(page) {
-  const broken = await page.evaluate(() => {
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-    );
-    const result = [];
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      if (node.parentElement.closest("script, style, input, textarea, select"))
-        continue;
-      for (const match of node.textContent.matchAll(/[가-힣]{2,}/g)) {
-        const range = document.createRange();
-        range.setStart(node, match.index);
-        range.setEnd(node, match.index + match[0].length);
-        const rects = [...range.getClientRects()].filter(
-          (r) => r.width && r.height,
-        );
-        if (new Set(rects.map((r) => Math.round(r.y))).size > 1)
-          result.push(match[0]);
-      }
-    }
-    return result;
-  });
-  expect(broken).toEqual([]);
-}
+import { checkKoreanWords } from "./helpers.mjs";
 
 for (const width of [1440, 390, 325]) {
   test(`create, view, edit, pause and delete a share rule at ${width}px`, async ({
@@ -198,7 +173,7 @@ test("balance layout audit covers all routes and small mobile screens", async ()
 });
 
 for (const width of [1440, 390, 325]) {
-  test(`account menu, notification status and removed settings at ${width}px`, async ({
+  test(`account menu, notification status and avatar settings at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
@@ -215,6 +190,8 @@ for (const width of [1440, 390, 325]) {
             email: "test@example.com",
           }),
         getShareState: () => ok({}),
+        getServerState: () =>
+          ok({ status: "stopped", tailscaleConnected: false }),
         getUpdateState: () => ok({}),
         listRules: () => ok({ rules: [] }),
         listLogs: () => ok({ logs: [] }),
@@ -274,7 +251,7 @@ for (const width of [1440, 390, 325]) {
     ).toBeVisible();
     await expect(
       page.getByRole("menuitem", { name: "설정", exact: true }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     await page.screenshot({
       path: `${out}/account-menu-${width}.png`,
       fullPage: true,
@@ -287,15 +264,25 @@ for (const width of [1440, 390, 325]) {
     await expect(avatar).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(
-      page.getByRole("menuitem", { name: "로그아웃" }),
+      page.getByRole("menuitem", { name: "설정", exact: true }),
     ).toBeFocused();
     await page.keyboard.press("Escape");
     await avatar.click();
     await page.getByRole("heading", { name: "내 규칙", exact: true }).click();
     await expect(page.getByRole("menu")).toHaveCount(0);
 
-    await page.goto("/#/settings");
-    await expect(page).toHaveURL(/#\/rules$/);
+    await avatar.click();
+    await page.getByRole("menuitem", { name: "설정", exact: true }).click();
+    await expect(page).toHaveURL(/#\/settings$/);
+    await expect(
+      page.getByRole("heading", { name: "설정", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("navigation", { name: "주 메뉴" })
+        .last()
+        .getByRole("link"),
+    ).toHaveCount(2);
     await page.goto("/#/logs");
     await expect(
       page.getByRole("heading", { name: "실행 기록", exact: true }),

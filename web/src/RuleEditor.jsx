@@ -178,9 +178,9 @@ export default function RuleEditor() {
       return;
     }
     setBusy(true);
-    requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
       try {
-        save(toPayload(form));
+        await save(toPayload(form));
         setDirty(false);
         navigate("/rules");
       } catch (err) {

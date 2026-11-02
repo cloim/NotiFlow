@@ -2,6 +2,12 @@ package com.vibe.notiflow
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.vibe.notiflow.remote.RemoteServerService
+import com.vibe.notiflow.remote.TailscaleAddress
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -33,7 +39,6 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.vibe.notiflow.di.ServiceLocator
-import com.vibe.notiflow.domain.model.Rule
 import com.vibe.notiflow.share.ShareInbox
 import com.vibe.notiflow.update.GitHubReleaseUpdate
 import kotlinx.coroutines.Dispatchers
@@ -41,10 +46,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -59,6 +60,8 @@ class MainActivity : ComponentActivity() {
     private var updateState = JSONObject().put("busy", false)
     private var lastUpdateUrl: String? = null
     private var authError: String? = null
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val ruleManagement by lazy { RuleManagement(ServiceLocator.ruleRepository) }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,7 +103,8 @@ class MainActivity : ComponentActivity() {
         setContentView(root)
         ViewCompat.requestApplyInsets(root)
         setBars(false)
-        webView.loadUrl("https://appassets.androidplatform.net/assets/web/index.html")
+        webView.loadUrl("https://appassets.androidplatform.net/assets/web/index.html" +
+            if (intent.getBooleanExtra("openSettings", false)) "#/settings" else "")
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 webView.evaluateJavascript("window.dispatchEvent(new Event('notiflowBack'))", null)
@@ -123,6 +127,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         receiveShare(intent)
+        if (intent.getBooleanExtra("openSettings", false)) {
+            webView.evaluateJavascript("window.location.hash = '/settings'", null)
+        }
     }
 
     private fun receiveShare(incoming: Intent) {
@@ -204,19 +211,9 @@ class MainActivity : ComponentActivity() {
 
     private fun signedIn() { check(auth.currentUser != null) { "Google 계정으로 로그인해 주세요" } }
 
-    private fun ruleJson(rule: Rule): JSONObject {
-        val result = JSONObject(Json.encodeToString(rule))
-        val source = rule.filters.firstOrNull { it.type == "source.equals" }?.config?.get("value")?.jsonPrimitive?.contentOrNull
-        result.put("source", source ?: "notification")
-        if (rule.conditionExpression == null) {
-            val rows = JSONArray()
-            rule.filters.filter { it.type !in setOf("package.equals", "source.equals") }.forEach {
-                rows.put(JSONObject().put("type", it.type).put("value", it.config["value"]?.jsonPrimitive?.contentOrNull ?: "")
-                    .put("operator", rule.filterOperator.name))
-            }
-            result.put("conditionExpression", JSONObject().put("rows", rows))
-        }
-        return result
+    private fun ruleResponse(method: String, args: JSONArray = JSONArray()): String = response {
+        signedIn()
+        runBlocking(Dispatchers.IO) { ruleManagement.execute(method, args) }
     }
 
     inner class Bridge {
@@ -230,6 +227,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun signOutGoogle(): String = response {
             runOnUiThread {
                 lifecycleScope.launch {
+                    stopService(Intent(this@MainActivity, RemoteServerService::class.java))
                     auth.signOut()
                     runCatching { credentials.clearCredentialState(ClearCredentialStateRequest()) }
                     emit("notiflowAuthChanged", authState())
@@ -237,39 +235,45 @@ class MainActivity : ComponentActivity() {
             }
             JSONObject()
         }
-        @JavascriptInterface fun listRules(): String = response {
+        @JavascriptInterface fun listRules(): String = ruleResponse("listRules")
+        @JavascriptInterface fun createRule(inputJson: String): String = ruleResponse("createRule", JSONArray().put(inputJson))
+        @JavascriptInterface fun updateRule(inputJson: String): String = ruleResponse("updateRule", JSONArray().put(inputJson))
+        @JavascriptInterface fun setRuleEnabled(id: Long, enabled: Boolean): String =
+            ruleResponse("setRuleEnabled", JSONArray().put(id).put(enabled))
+        @JavascriptInterface fun deleteRule(id: Long): String = ruleResponse("deleteRule", JSONArray().put(id))
+        @JavascriptInterface fun listLogs(limit: Int): String = ruleResponse("listLogs", JSONArray().put(limit))
+        @JavascriptInterface fun getServerState(): String = response { signedIn(); RemoteServerService.snapshot() }
+        @JavascriptInterface fun startServer(): String = response {
             signedIn()
-            JSONObject().put("rules", JSONArray().apply {
-                runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.getAllRules() }.forEach { put(ruleJson(it)) }
-            })
+            check(TailscaleAddress.find() != null) { "Tailscale 앱에서 연결을 켠 뒤 다시 실행해 주세요" }
+            if (RemoteServerService.snapshot().optString("status") !in setOf("running", "starting")) {
+                RemoteServerService.starting()
+                runOnUiThread {
+                    try {
+                        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this@MainActivity,
+                                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        ContextCompat.startForegroundService(this@MainActivity, Intent(this@MainActivity, RemoteServerService::class.java))
+                    } catch (_: Exception) {
+                        RemoteServerService.fail("앱을 열고 서버를 다시 실행해 주세요")
+                    }
+                }
+            }
+            RemoteServerService.snapshot()
         }
-        @JavascriptInterface fun createRule(inputJson: String): String = response {
+        @JavascriptInterface fun stopServer(): String = response {
             signedIn()
-            val rule = RuleInputFactory().build(JSONObject(inputJson), null)
-            JSONObject().put("ruleId", runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.upsertRule(rule) })
-        }
-        @JavascriptInterface fun updateRule(inputJson: String): String = response {
-            signedIn()
-            val input = JSONObject(inputJson)
-            val existing = runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.getRuleById(input.getLong("id")) }
-                ?: error("규칙을 다시 불러와 주세요")
-            val rule = RuleInputFactory().build(input, existing)
-            JSONObject().put("ruleId", runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.upsertRule(rule) })
-        }
-        @JavascriptInterface fun setRuleEnabled(id: Long, enabled: Boolean): String = response {
-            signedIn()
-            runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.updateEnabled(id, enabled) }
+            stopService(Intent(this@MainActivity, RemoteServerService::class.java))
             JSONObject()
         }
-        @JavascriptInterface fun deleteRule(id: Long): String = response {
-            signedIn()
-            runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.deleteRule(id) }
+        @JavascriptInterface fun openTailscale(): String = response {
+            runOnUiThread {
+                val launch = packageManager.getLaunchIntentForPackage("com.tailscale.ipn")
+                    ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.tailscale.ipn"))
+                startActivity(launch)
+            }
             JSONObject()
-        }
-        @JavascriptInterface fun listLogs(limit: Int): String = response {
-            signedIn()
-            val logs = runBlocking(Dispatchers.IO) { ServiceLocator.ruleRepository.getRecentLogs(limit.coerceIn(1, 500)) }
-            JSONObject().put("logs", JSONArray(Json.encodeToString(logs)))
         }
         @JavascriptInterface fun isNotificationListenerEnabled(): Boolean = notificationAccessEnabled()
         @JavascriptInterface fun openNotificationListenerSettings() {

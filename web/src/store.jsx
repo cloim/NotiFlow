@@ -4,31 +4,33 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 
 const Store = createContext(null);
 export const useFlow = () => useContext(Store);
 const previewKey = "notiflow.preview.rules.v2";
-export function call(name, ...args) {
-  const bridge = window.NotiFlowNative;
-  if (!bridge?.[name]) throw new Error("Android 앱에서 사용할 수 있어요");
-  const raw = bridge[name](...args);
-  if (raw == null || typeof raw === "boolean") return raw;
-  const result = JSON.parse(raw);
-  if (result.ok === false)
-    throw new Error(result.error || "다시 시도해 주세요");
-  return result.data ?? result;
-}
+import {
+  call,
+  remote,
+  connectRemote,
+  disconnectRemote,
+  hasRemoteCode,
+} from "./transport.js";
+export { call } from "./transport.js";
 export function FlowProvider({ children }) {
   const native = Boolean(window.NotiFlowNative);
+  const refreshVersion = useRef(0);
   const [preview, setPreview] = useState(
     !native &&
+      !remote &&
       (sessionStorage.getItem("notiflow.preview") === "1" ||
         new URLSearchParams(window.location.search).get("preview") === "1"),
   );
   const [auth, setAuth] = useState(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [rules, setRules] = useState([]);
+  const [pendingRule, setPendingRule] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,23 +47,56 @@ export function FlowProvider({ children }) {
     const timer = setTimeout(() => setToast(null), 4200);
     return () => clearTimeout(timer);
   }, [toast]);
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
+    const version = ++refreshVersion.current;
     setError("");
     try {
-      if (native) {
-        setRules(call("listRules").rules || []);
-        setLogs(call("listLogs", 200).logs || []);
+      if (native || remote) {
+        const [ruleData, logData] = await Promise.all([
+          call("listRules"),
+          call("listLogs", 200),
+        ]);
+        if (version !== refreshVersion.current) return;
+        setRules(ruleData.rules || []);
+        setLogs(logData.logs || []);
       } else if (preview) {
         setRules(JSON.parse(localStorage.getItem(previewKey) || "[]"));
         setLogs([]);
       }
     } catch (err) {
-      setError(err.message);
+      if (version === refreshVersion.current) setError(err.message);
     } finally {
-      setLoading(false);
+      if (version === refreshVersion.current) setLoading(false);
     }
   }, [native, preview]);
   useEffect(() => {
+    if (remote) {
+      let active = true;
+      const expired = () => {
+        refreshVersion.current++;
+        setAuth({ signedIn: false });
+        setRules([]);
+        setLogs([]);
+        setLoading(false);
+      };
+      if (hasRemoteCode())
+        call("getAuthState")
+          .then((value) => {
+            if (active) setAuth(value);
+          })
+          .catch((err) => {
+            if (active) {
+              expired();
+              notify(err.message, "error");
+            }
+          });
+      else expired();
+      window.addEventListener("notiflowRemoteExpired", expired);
+      return () => {
+        active = false;
+        window.removeEventListener("notiflowRemoteExpired", expired);
+      };
+    }
     if (!native) {
       setAuth({
         signedIn: preview,
@@ -108,14 +143,14 @@ export function FlowProvider({ children }) {
     call("checkForUpdate");
   }, [native]);
   useEffect(() => {
-    if (!native || !auth?.signedIn) return;
+    if ((!native && !remote) || !auth?.signedIn) return;
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") refresh();
     }, 4000);
     const resume = () => {
       if (document.visibilityState === "visible") {
         refresh();
-        setShare(call("getShareState"));
+        if (native) setShare(call("getShareState"));
       }
     };
     document.addEventListener("visibilitychange", resume);
@@ -128,9 +163,13 @@ export function FlowProvider({ children }) {
     localStorage.setItem(previewKey, JSON.stringify(items));
     setRules(items);
   };
-  const save = (payload) => {
-    if (native)
-      call(payload.id ? "updateRule" : "createRule", JSON.stringify(payload));
+  const save = async (payload) => {
+    refreshVersion.current++;
+    if (native || remote)
+      await call(
+        payload.id ? "updateRule" : "createRule",
+        JSON.stringify(payload),
+      );
     else {
       const item = {
         ...payload,
@@ -145,29 +184,45 @@ export function FlowProvider({ children }) {
           : [...rules, item],
       );
     }
-    refresh();
+    await refresh();
     notify(payload.id ? "규칙을 저장했어요" : "새 규칙을 만들었어요");
   };
-  const toggle = (rule) => {
+  const toggle = async (rule) => {
+    if (pendingRule !== null) return;
+    setPendingRule(rule.id);
+    refreshVersion.current++;
     try {
-      if (native) call("setRuleEnabled", rule.id, !rule.enabled);
+      if (native || remote)
+        await call("setRuleEnabled", rule.id, !rule.enabled);
       else
         persistPreview(
           rules.map((r) =>
             r.id === rule.id ? { ...r, enabled: !r.enabled } : r,
           ),
         );
-      refresh();
+      await refresh();
       notify(rule.enabled ? "규칙을 잠시 멈췄어요" : "규칙을 켰어요");
     } catch (err) {
       notify(err.message, "error");
+    } finally {
+      setPendingRule(null);
     }
   };
-  const remove = (id) => {
-    if (native) call("deleteRule", id);
-    else persistPreview(rules.filter((r) => r.id !== id));
-    refresh();
-    notify("규칙을 삭제했어요");
+  const remove = async (id) => {
+    if (pendingRule !== null)
+      throw new Error(
+        "변경 사항을 저장하고 있어요. 잠시 후 다시 시도해 주세요",
+      );
+    setPendingRule(id);
+    refreshVersion.current++;
+    try {
+      if (native || remote) await call("deleteRule", id);
+      else persistPreview(rules.filter((r) => r.id !== id));
+      await refresh();
+      notify("규칙을 삭제했어요");
+    } finally {
+      setPendingRule(null);
+    }
   };
   const login = () => {
     try {
@@ -178,8 +233,19 @@ export function FlowProvider({ children }) {
       notify(err.message, "error");
     }
   };
+  const pair = async (code) => {
+    const value = await connectRemote(code);
+    setLoading(true);
+    setAuth(value);
+  };
   const logout = () => {
-    if (native) call("signOutGoogle");
+    refreshVersion.current++;
+    if (remote) {
+      disconnectRemote();
+      setAuth({ signedIn: false });
+      setRules([]);
+      setLogs([]);
+    } else if (native) call("signOutGoogle");
     else {
       sessionStorage.removeItem("notiflow.preview");
       setPreview(false);
@@ -193,10 +259,13 @@ export function FlowProvider({ children }) {
     <Store.Provider
       value={{
         native,
+        remote,
+        pair,
         preview,
         auth,
         authBusy,
         rules,
+        pendingRule,
         logs,
         loading,
         error,

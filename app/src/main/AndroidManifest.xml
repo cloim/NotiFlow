@@ -2,6 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <queries>
+        <package android:name="com.tailscale.ipn" />
+    </queries>
 
     <application
         android:name="com.vibe.notiflow.NotiFlowApp"
@@ -33,6 +40,11 @@
         </activity>
 
 
+        <service android:name="com.vibe.notiflow.remote.RemoteServerService"
+            android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started private Tailscale web server for editing local rules and viewing execution logs until explicitly stopped" />
+        </service>
         <service
             android:name="com.vibe.notiflow.notification.NotiFlowNotificationListenerService"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import { useNavigate } from "react-router-dom";
 import {
   BellOff,
   BellRing,
   CircleHelp,
   LoaderCircle,
   LogOut,
+  Settings,
 } from "lucide-react";
 import { call, useFlow } from "./store.jsx";
 
@@ -31,7 +33,8 @@ export function HeaderTooltip({ label, children }) {
 }
 
 export default function HeaderActions() {
-  const { native, auth, logout, notify } = useFlow();
+  const { native, remote, auth, logout, notify } = useFlow();
+  const navigate = useNavigate();
   const [permission, setPermission] = useState(native ? null : "browser");
   const [open, setOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -167,12 +170,19 @@ export default function HeaderActions() {
             </DropdownMenu.Label>
             <DropdownMenu.Separator className="my-1 h-px bg-line" />
             <DropdownMenu.Item
+              onSelect={() => navigate("/settings")}
+              className="flex min-h-10 cursor-pointer select-none items-center gap-2.5 rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent"
+            >
+              <Settings size={16} aria-hidden="true" />
+              설정
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
               disabled={logoutBusy}
               onSelect={signOut}
               className="flex min-h-10 cursor-pointer select-none items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-danger outline-none data-[highlighted]:bg-danger-surface data-[disabled]:opacity-50"
             >
               <LogOut size={16} aria-hidden="true" />
-              로그아웃
+              {remote ? "연결 해제" : "로그아웃"}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

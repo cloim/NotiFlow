@@ -34,7 +34,7 @@ export function runLayoutAudit() {
     if (browser && existsSync(browser))
       args.push("--browser-executable", browser);
   }
-  for (const route of ["rules", "rules/new", "logs"])
+  for (const route of ["rules", "rules/new", "logs", "settings"])
     args.push("--url", `http://127.0.0.1:4186/?preview=1#/${route}`);
   args.push(
     "--viewport",

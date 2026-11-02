@@ -12,12 +12,12 @@ if (file("google-services.json").exists()) {
 val androidVersionName = (project.findProperty("androidVersionName") as String?)
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
-    ?: "2.0.0"
+    ?: "2.1.0"
 val androidVersionCode = (project.findProperty("androidVersionCode") as String?)
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
     ?.toInt()
-    ?: 29
+    ?: 30
 
 fun signingProperty(name: String): String? =
     (project.findProperty(name) as String?)?.trim()?.takeIf { it.isNotEmpty() }
@@ -115,6 +115,7 @@ dependencies {
 
     // Network
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 
     // Firebase Cloud Messaging
     implementation(platform("com.google.firebase:firebase-bom:34.7.0"))

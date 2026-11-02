@@ -28,6 +28,8 @@ import { FlowProvider, useFlow, call } from "./store.jsx";
 import { Modal, GoogleMark } from "./components.jsx";
 import { RuleList, RuleDetail, Logs } from "./RuleScreens.jsx";
 import RuleEditor from "./RuleEditor.jsx";
+import Settings from "./Settings.jsx";
+import RemoteLogin from "./RemoteLogin.jsx";
 import HeaderActions, { HeaderTooltip } from "./HeaderActions.jsx";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
@@ -160,7 +162,9 @@ function Shell() {
       ? "규칙 상세"
       : section === "logs"
         ? "실행 기록"
-        : "내 규칙";
+        : section === "settings"
+          ? "설정"
+          : "내 규칙";
   useEffect(() => {
     const back = () => {
       if (location.pathname !== "/rules") navigate("/rules");
@@ -181,7 +185,7 @@ function Shell() {
   if (!flow.auth.signedIn)
     return (
       <>
-        <Login />
+        {flow.remote ? <RemoteLogin /> : <Login />}
         <Toast />
         <UpdateDialog />
       </>
@@ -207,19 +211,11 @@ function Shell() {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto rounded-2xl border border-line p-4">
-          <Share2 size={21} className="mb-3 text-primary" />
-          <p className="text-sm font-semibold">공유 메뉴에서 만나요</p>
-          <p className="mt-2 text-xs leading-6 text-muted">
-            다른 앱에서 콘텐츠를 공유하고 NotiFlow를 선택하세요
-          </p>
-        </div>
-        <p className="mt-5 px-1 text-xs text-muted">작은 규칙, 매끄러운 연결</p>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line bg-canvas px-5 sm:px-8 xl:px-12">
           <div className="flex min-w-0 items-center gap-3">
-            {(editor || detail) && (
+            {(editor || detail || section === "settings") && (
               <HeaderTooltip label="규칙 목록으로">
                 <Link
                   to="/rules"
@@ -230,17 +226,12 @@ function Shell() {
                 </Link>
               </HeaderTooltip>
             )}
-            <div>
-              <p className="mb-1 hidden text-[11px] font-medium tracking-wide text-muted sm:block">
-                {editor || detail ? "내 규칙 / 편집 공간" : "나의 자동화 공간"}
-              </p>
-              <h1
-                data-ui-audit-context-title
-                className="text-xl font-bold tracking-tight sm:text-2xl"
-              >
-                {title}
-              </h1>
-            </div>
+            <h1
+              data-ui-audit-context-title
+              className="text-xl font-bold tracking-tight sm:text-2xl"
+            >
+              {title}
+            </h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             {section === "rules" && !editor && !detail && (
@@ -281,6 +272,7 @@ function Shell() {
             <Route path="/rules/:id/edit" element={<RuleEditor />} />
             <Route path="/rules/:id" element={<RuleDetail />} />
             <Route path="/logs" element={<Logs />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/rules" replace />} />
           </Routes>
         </main>
