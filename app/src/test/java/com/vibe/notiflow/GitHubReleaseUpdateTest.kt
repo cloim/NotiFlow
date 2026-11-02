@@ -8,6 +8,15 @@ import org.junit.Test
 
 class GitHubReleaseUpdateTest {
     @Test
+    fun newerReleaseWithoutMatchingApkStillOffersReleasePage() {
+        val update = GitHubReleaseUpdate.parseLatestRelease(
+            """{"tag_name":"v2.0.0","html_url":"https://github.com/cloim/NotiFlow/releases/tag/v2.0.0","assets":[]}""",
+            "1.0.4", false)
+        assertTrue(update.available)
+        assertEquals(null, update.downloadUrl)
+        assertTrue(update.releaseUrl.endsWith("v2.0.0"))
+    }
+    @Test
     fun comparesSemanticVersionsWithTagPrefix() {
         assertTrue(GitHubReleaseUpdate.isNewerVersion("v1.0.11", "1.0.10"))
         assertTrue(GitHubReleaseUpdate.isNewerVersion("v1.1.0", "1.0.99"))

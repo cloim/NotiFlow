@@ -15,6 +15,8 @@ async function run() {
 }
 
 run().catch((error) => {
-  process.stderr.write(`[sync-assets] failed: ${error?.message ?? String(error)}\n`);
+  process.stderr.write(
+    `[sync-assets] failed: ${error?.message ?? String(error)}\n`,
+  );
   process.exit(1);
 });

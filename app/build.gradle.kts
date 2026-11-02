@@ -9,22 +9,15 @@ if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
-fun String.escapeForBuildConfig(): String =
-    replace("\\", "\\\\").replace("\"", "\\\"")
-
-val webAppUrl = (
-    project.findProperty("notiflowWebAppUrl") as String?
-)?.trim().orEmpty().escapeForBuildConfig()
-
 val androidVersionName = (project.findProperty("androidVersionName") as String?)
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
-    ?: "1.0.4"
+    ?: "2.0.0"
 val androidVersionCode = (project.findProperty("androidVersionCode") as String?)
     ?.trim()
     ?.takeIf { it.isNotEmpty() }
     ?.toInt()
-    ?: 5
+    ?: 29
 
 fun signingProperty(name: String): String? =
     (project.findProperty(name) as String?)?.trim()?.takeIf { it.isNotEmpty() }
@@ -50,7 +43,6 @@ android {
         targetSdk = 35
         versionCode = androidVersionCode
         versionName = androidVersionName
-        buildConfigField("String", "WEB_APP_URL", "\"$webAppUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -126,9 +118,7 @@ dependencies {
 
     // Firebase Cloud Messaging
     implementation(platform("com.google.firebase:firebase-bom:34.7.0"))
-    implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
 
     // Google Sign-In with Credential Manager
     implementation("androidx.credentials:credentials:1.3.0")
@@ -153,4 +143,5 @@ dependencies {
     testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }

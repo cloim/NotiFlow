@@ -61,7 +61,7 @@ object GitHubReleaseUpdate {
         }
 
         return UpdateCandidate(
-            available = isNewer && !selectedUrl.isNullOrBlank(),
+            available = isNewer,
             latestTag = latestTag,
             latestVersionName = latestVersionName,
             releaseUrl = releaseUrl,
