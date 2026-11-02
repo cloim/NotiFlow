@@ -3,6 +3,11 @@ package com.vibe.notiflow.remote
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.DataInputStream
+import java.io.EOFException
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
 import java.security.MessageDigest
 
 /** Bound to one VPN address, never a wildcard or LAN interface. */
@@ -33,14 +38,25 @@ class RemoteHttpServer(
                 return json(Response.Status.UNSUPPORTED_MEDIA_TYPE, "JSON 요청이 필요합니다")
             }
             return try {
-                val body = HashMap<String, String>()
-                session.parseBody(body)
-                val input = JSONObject(body["postData"] ?: "")
+                // JSON is UTF-8, including browser fetch without a charset.
+                // NanoHTTPD parseBody defaults that request to US-ASCII and
+                // permanently corrupts Korean names and condition values.
+                val bytes = ByteArray(length.toInt())
+                DataInputStream(session.inputStream).readFully(bytes)
+                val body = Charsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes)).toString()
+                val input = JSONObject(body)
                 val method = input.getString("method")
                 require(method in METHODS) { "지원하지 않는 요청입니다" }
                 val data = execute(method, input.optJSONArray("args") ?: JSONArray())
                 secured(newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8",
                     JSONObject().put("ok", true).put("data", data).toString()))
+            } catch (_: CharacterCodingException) {
+                json(Response.Status.BAD_REQUEST, "요청 본문을 UTF-8 JSON으로 전송해 주세요")
+            } catch (_: EOFException) {
+                json(Response.Status.BAD_REQUEST, "요청 본문을 다시 전송해 주세요")
             } catch (_: org.json.JSONException) {
                 json(Response.Status.BAD_REQUEST, "요청 형식을 확인해 주세요")
             } catch (error: IllegalArgumentException) {

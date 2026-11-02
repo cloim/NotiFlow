@@ -70,9 +70,50 @@ class RemoteHttpServerTest {
         assertEquals(403, rpc("listRules", origin = "https://example.com").first)
         assertEquals(200, rpc("listRules", origin = "http://127.0.0.1:${server.listeningPort}").first)
         assertEquals(400, rpc("startServer").first)
+        assertEquals(400, rpc("saveServerAccessCode", JSONArray().put("changed-test-code")).first)
         ownerSignedIn = false
         assertEquals(401, rpc("listRules").first)
         assertEquals(401, rpc("createRule", JSONArray().put("{}")).first)
+        assertTrue(stored.isEmpty())
+    }
+
+    private fun browserRpc(method: String, args: JSONArray): Pair<Int, JSONObject> {
+        // Browser fetch sends JSON as UTF-8 without a charset parameter. String
+        // toRequestBody(mediaType) adds charset=utf-8 and used to hide this bug.
+        val bytes = JSONObject().put("method", method).put("args", args).toString().toByteArray(Charsets.UTF_8)
+        val request = Request.Builder().url(url()).header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $code").post(bytes.toRequestBody()).build()
+        return client.newCall(request).execute().use { it.code to JSONObject(it.body!!.string()) }
+    }
+
+    @Test fun browserUtf8CreateAndEditPreserveKoreanEmojiAndConditionText() {
+        val original = "한글 공유 규칙 🔔 日本語 中文"
+        val input = JSONObject().put("name", original).put("source", "share")
+            .put("webhook", JSONObject().put("url", "https://example.com/hook"))
+            .put("conditionExpression", JSONObject().put("rows", JSONArray().put(
+                JSONObject().put("type", "text.contains").put("value", "결제 완료 😺")
+            )))
+        assertEquals(200, browserRpc("createRule", JSONArray().put(input.toString())).first)
+        assertEquals(original, stored.getValue(1).name)
+        assertEquals("결제 완료 😺", stored.getValue(1).conditionExpression!!.rows.single().value)
+        val edited = "한글 이름 수정 완료 🌊"
+        input.put("id", 1).put("name", edited)
+        assertEquals(200, browserRpc("updateRule", JSONArray().put(input.toString())).first)
+        val listed = browserRpc("listRules", JSONArray()).second.getJSONObject("data").getJSONArray("rules")
+        assertEquals(edited, listed.getJSONObject(0).getString("name"))
+        assertEquals(edited, stored.getValue(1).name)
+    }
+
+    @Test fun malformedUtf8IsRejectedBeforeAnyRuleIsWritten() {
+        val input = JSONObject().put("name", "bad-utf8-name").put("source", "share")
+            .put("webhook", JSONObject().put("url", "https://example.com/hook"))
+        val json = JSONObject().put("method", "createRule").put("args", JSONArray().put(input.toString())).toString()
+        val index = json.indexOf("bad-utf8-name")
+        val bytes = json.substring(0, index).toByteArray(Charsets.UTF_8) + byteArrayOf(0xc3.toByte(), 0x28) +
+            json.substring(index + "bad-utf8-name".length).toByteArray(Charsets.UTF_8)
+        val request = Request.Builder().url(url()).header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $code").post(bytes.toRequestBody()).build()
+        client.newCall(request).execute().use { assertEquals(400, it.code) }
         assertTrue(stored.isEmpty())
     }
 
