@@ -1,12 +1,7 @@
 <resources>
-    <style name="Theme.NotiFlow" parent="Theme.Material3.DayNight.NoActionBar" />
-
-    <style name="Theme.NotiFlow.FullScreenWake" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowActionBar">false</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:colorBackgroundCacheHint">@null</item>
-        <item name="android:windowDisablePreview">true</item>
+    <style name="Theme.NotiFlow" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">#0d1524</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">#87b9ff</item>
     </style>
 </resources>

@@ -1,0 +1,6 @@
+web/index.html text eol=lf
+app/src/main/assets/web/*.html text eol=lf
+app/src/main/assets/web/assets/*.css text eol=lf
+# Generated JavaScript can contain intentional whitespace in template strings.
+app/src/main/assets/web/assets/*.js text eol=lf whitespace=-blank-at-eol
+*.png binary

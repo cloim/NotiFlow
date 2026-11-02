@@ -1,170 +1,73 @@
-# NotiFlow Android Hybrid MVP
+# NotiFlow
 
-NotiFlow는 NotificationListenerService 기반의 네이티브 엔진(알림 수집/룰 실행)을 유지하면서, UI는 WebView로 로드하는 Android + Web 하이브리드 구조입니다.
+Android에서 공유 콘텐츠와 알림을 규칙에 따라 웹훅으로 연결합니다.
 
-## 현재 구조
-- Android Native
-  - NotificationListenerService 수집 파이프라인
-  - Rule Engine + Filter/Action Registry
-  - Room 저장소 + EncryptedSharedPreferences
-  - WorkManager 재시도
-- Web UI
-  - MainActivity는 WebView Shell 역할
-  - 기본 로드 경로: `file:///android_asset/web/index.html`
-  - 선택 로드 경로: Gradle 속성 `-PnotiflowWebAppUrl=https://...`
+- Google 계정 로그인
+- 앱 공유 수신: 텍스트, 링크, 이미지, PDF, 동영상, 오디오와 파일
+- 단일 공유와 여러 파일 공유, 콘텐츠 MIME 타입 조건
+- 제목, 본문, 정규식, AND/OR와 괄호 조건
+- 웹훅 POST, PUT, PATCH, 사용자 헤더와 JSON 템플릿
+- 규칙 활성화, 수정, 삭제와 실행 기록
+- 아바타에서 로그아웃, 헤더 아이콘에서 알림 접근 상태 확인과 권한 화면 열기
+- 앱 시작 시 업데이트 확인, 변경 내용 안내와 브라우저 APK 다운로드
 
-## JS Bridge (Android -> Web)
-WebView에서 `window.NotiFlowNative` 객체를 사용할 수 있습니다.
+파일은 최대 20개, 합계 10MB까지 지원합니다. 파일 이름, MIME 타입, 크기와 Base64 본문을 JSON으로 전송합니다. 규칙과 기록은 기기에 저장합니다. Google 로그인은 기기 이용을 확인하며 계정 간 클라우드 동기화는 제공하지 않습니다.
 
-- `getAppInfo(): string(JSON)`
-- `listRules(): string(JSON)`
-- `listLogs(limit: number): string(JSON)`
-- `createRule(inputJson: string): string(JSON)`
-- `updateRule(inputJson: string): string(JSON)`
-- `deleteRule(ruleId: number): string(JSON)`
-- `setRuleEnabled(ruleId: number, enabled: boolean): string(JSON)`
-- `exportRules(inputJson: string): string(JSON)`
-- `importRules(inputJson: string): string(JSON)`
-- `isNotificationListenerEnabled(): boolean`
-- `openNotificationListenerSettings(): void`
+## 개발 환경
 
-`createRule` 입력 예시:
-```json
-{
-  "name": "Kakao payment alert",
-  "packageName": "com.kakao.talk",
-  "conditionOperator": "AND",
-  "conditions": [
-    { "type": "text.contains", "value": "결제" }
-  ],
-  "webhook": {
-    "url": "https://example.com/webhook",
-    "method": "POST",
-    "headers": { "X-App": "NotiFlow" },
-    "payloadTemplate": "{\"title\":{{title}},\"text\":{{text}}}",
-    "token": "optional-secret-token"
-  }
-}
-```
+Node.js 22.12 이상, JDK 17 이상, Android SDK 35가 필요합니다. 기존 React와 Android WebView 구성을 유지합니다.
 
-`updateRule`은 `createRule`과 동일 페이로드에 `id`를 포함해 호출하면 됩니다.
-- `webhook.token`을 생략하면 기존 토큰 유지
-- `webhook.token`에 새 값을 넣으면 교체
-- `webhook.token`을 `""`로 보내면 삭제
-- `webhook.headers`는 JSON object 형식 (`{ "X-App": "NotiFlow" }`)
+1. `web`에서 `npm ci`를 실행합니다.
+2. 루트 `local.properties`에 Android SDK 경로를 설정합니다.
+3. Firebase Android 설정을 `app/google-services.json`에 둡니다. Firebase Authentication에서 Google 제공자를 활성화하고 패키지와 빌드 인증서 SHA 지문을 등록합니다. 설정 파일은 Git에서 제외합니다.
+4. `web`에서 `npm run dev`를 실행합니다. 브라우저는 로그인 화면과 명시적 미리보기를 제공합니다. 실제 Google 로그인, 공유 수신과 웹훅 실행은 Android 앱에서 동작합니다.
 
-`exportRules` 입력 예시:
-```json
-{
-  "ruleIds": [1, 2],
-  "includeSecrets": false
-}
-```
+## 검증과 APK 빌드
 
-`exportRules`는 `{ "data": { "export": ... } }` 형태로 반환하며, `data.export`에는 다음 필드가 포함됩니다.
-- `schemaVersion`: 내보내기 JSON 스키마 버전
-- `app`: 내보내기를 생성한 앱 정보
-- `exportedAt`: epoch milliseconds 내보내기 시각
-- `includeSecrets`: 토큰 포함 여부
-- `rules`: 내보낸 룰 목록
+규칙, 공유 수신 또는 화면을 변경한 뒤 아래 순서로 검증합니다. Windows의 긴 명령은 `~/.agents/scripts/maintenance/run_job.py`에 제출하고 최종 종료 상태를 확인합니다.
 
-`includeSecrets=true`로 내보내면 webhook token이 plaintext `webhook.token` 값으로 포함됩니다. 공유 파일에는 토큰이 평문으로 들어가므로 필요한 경우에만 사용하세요.
-
-`importRules`는 bridge 응답 envelope 전체가 아니라(not the full bridge response envelope), `exportRules` 응답의 `data.export`에 해당하는 exported JSON object/file content를 JSON 문자열로 받습니다. 가져오기는 기존 룰을 유지(keeps existing rules)하면서 새 룰을 추가(adds new rules)하고, 내보낸 파일의 룰 id는 무시(ignores file ids)합니다.
-
-## React 개발
-`web/` 폴더에 Vite + React 샘플이 포함되어 있습니다.
-
-기본 Web UI 포함 기능:
-- Rule 생성/수정/삭제 + 다중 조건 편집
-- 수정 시 Draft Diff 미리보기
-- 실행 로그 필터 (결과 코드/패키지/기간)
-
-1. 의존성 설치
-```bash
+```text
 cd web
-npm install
-```
-2. 개발 서버 실행
-```bash
-npm run dev
-```
-3. Android 앱을 개발 서버 URL로 실행
-```bash
-cd ..
-gradlew.bat assembleDevDebug -PnotiflowWebAppUrl=http://10.0.2.2:5173
-```
-
-실기기에서는 `10.0.2.2` 대신 PC의 LAN IP를 사용하세요.
-
-## 로컬 번들 배포 방식
-1. Android 자산까지 자동 동기화 빌드
-```bash
-cd web
+npm test
+npx playwright install chromium --only-shell
+npm run test:ui
 npm run build:android
-```
-2. `-PnotiflowWebAppUrl` 없이 Android 빌드하면 `app/src/main/assets/web` 로컬 자산을 로드합니다.
-
-## Android 빌드
-1. Android SDK 설치
-2. `local.properties` 생성
-```properties
-sdk.dir=C:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
-```
-3. 실행
-```bash
-gradlew.bat assembleDevDebug
-gradlew.bat testDevDebugUnitTest
+cd ..
+gradlew.bat testProdDebugUnitTest assembleProdDebug lintProdDebug
 ```
 
-## GitHub Actions Android 배포
-`v*` 태그를 푸시하면 GitHub Actions가 개발/운영 APK와 Play Store용 운영 AAB를 빌드하고 GitHub Release에 업로드합니다. 앱 내부 `versionName`은 태그에서 앞의 `v`를 제거한 값으로 설정됩니다. 예를 들어 `v1.0.8` 태그는 앱 버전 `1.0.8`로 빌드됩니다.
+`test:ui`는 포트 4186에 임시 서버를 열고 종료 후 닫습니다. 테스트는 브라우저 미리보기와 모의 네이티브 이벤트로 생성, 조회, 수정, 삭제, Google 로그인 상태 전환, 공유 안내와 업데이트 창을 검증합니다. 실제 OAuth 인증을 대체하지 않습니다.
 
-생성 산출물:
-- 개발: `NotiFlow-dev-<tag>.apk` (`applicationId: com.cloimism.notiflow.dev`, 앱 이름: NotiFlow Dev)
-- 운영: `NotiFlow-prod-<tag>.apk` (`applicationId: com.cloimism.notiflow`, 앱 이름: NotiFlow)
-- Play Store 업로드용: `NotiFlow-prod-<tag>.aab` (`applicationId: com.cloimism.notiflow`)
+로컬 balance 스킬이 있으면 UI 테스트의 레이아웃 검사도 실행됩니다. 검사는 `~/.agents/skills/balance/scripts/ui-audit.mjs`를 호출하고 1440px, 390px와 325px 화면을 측정합니다. 단독 실행은 임시 서버가 실행 중일 때 `npm run test:layout`을 사용합니다. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`로 검사 브라우저를 지정할 수 있습니다. balance 스킬이 없는 환경은 `npx playwright test --grep-invert "balance layout"`로 화면 시나리오만 실행합니다.
 
-필수 GitHub Secrets:
-- `ANDROID_RELEASE_KEYSTORE_BASE64`: 기존 release keystore 파일을 base64 인코딩한 값
-- `ANDROID_RELEASE_KEY_ALIAS`: release key alias
-- `ANDROID_RELEASE_KEYSTORE_PASSWORD`: keystore password
-- `ANDROID_RELEASE_KEY_PASSWORD`: key password
-- `GOOGLE_SERVICES_JSON_BASE64`: Firebase Android `google-services.json` 파일을 base64 인코딩한 값
+화면 이미지, 검사 결과와 HTML 보고서는 Git에서 제외한 `docs/validation/`에 저장됩니다. 테스트와 빌드의 종료 코드 0이 자동 검증 통과 기준입니다. 오류가 있으면 해당 로그를 확인하고 수정한 뒤 다시 실행합니다. 실제 Google 계정 선택과 외부 앱의 URI 권한은 Android 기기에서 확인합니다.
 
-Windows PowerShell에서 keystore를 base64로 인코딩하는 예:
-```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\release.jks")) | Set-Clipboard
+디버그 APK는 `app/build/outputs/apk/prod/debug/app-prod-debug.apk`에 생성됩니다. 기존 배포 APK를 업데이트하려면 동일한 키로 서명한 release APK가 필요합니다.
+
+## 로컬 배포 절차
+
+GitHub Actions 대신 로컬에서 빌드, 서명 검증, APK 보관과 릴리스 업로드를 수행합니다. 런타임 업데이트 확인은 GitHub 최신 릴리스를 조회합니다. flavor가 일치하는 APK가 있으면 내려받고, 없으면 릴리스 페이지를 엽니다.
+
+1. `app/build.gradle.kts`의 기본 버전과 버전 코드를 올립니다.
+2. 기존 release 키의 서명 속성을 로컬 Gradle 사용자 설정에 준비합니다. 키와 비밀번호는 Git에 저장하지 않습니다.
+3. `ANDROID_HOME` 또는 `ANDROID_SDK_ROOT`를 설정합니다.
+4. 루트에서 `node scripts/release-android.mjs --plan`으로 절차를 확인합니다.
+5. 루트에서 `node scripts/release-android.mjs`를 실행해 웹 빌드, 동기화, 테스트, signed APK와 AAB 빌드, lint와 서명 검증을 수행합니다. 공용 서명 설정 파일을 사용할 때는 `--signing-properties <설정.properties> --keystore <서명.jks>`를 지정합니다. 설정 파일의 정확한 키는 `KEY_ALIAS`와 `PASSWORD`이며 비밀번호는 프로세스 환경으로만 전달됩니다. 기존 앱 업데이트용으로 빌드할 때는 `--expected-cert <기존 인증서 SHA-256>`도 지정합니다. SDK 경로는 환경 변수 또는 `local.properties`의 `sdk.dir`에서 읽습니다.
+6. `release/NotiFlow-prod-v<버전>.apk`를 확인합니다. 서명 실패나 빌드 실패 시 업로드를 보류하고 원인을 수정합니다.
+7. 릴리스 발행을 지시받은 경우 커밋과 푸시를 마친 뒤 `node scripts/release-android.mjs --publish --notes-file <변경내역.md>`를 실행합니다. GitHub CLI 로그인이 필요합니다. 스크립트는 `--publish`를 지정한 경우에만 업로드합니다.
+
+## 웹훅 본문
+
+본문 템플릿을 비우면 전체 이벤트를 전송합니다. 변수는 JSON 값으로 치환하므로 추가 따옴표를 붙이지 않습니다.
+
+```json
+{
+  "source": {{source}},
+  "mimeType": {{mimeType}},
+  "title": {{title}},
+  "text": {{text}},
+  "files": {{attachments}}
+}
 ```
 
-배포 태그 예:
-```bash
-git tag v1.0.5
-git push origin v1.0.5
-```
-
-## Play Store AAB 빌드
-Play Console에는 운영 flavor의 signed AAB를 업로드합니다.
-
-```powershell
-.\gradlew.bat bundleProdRelease `
-  -PandroidVersionName=1.0.9 `
-  -PandroidVersionCode=9 `
-  -PandroidReleaseStoreFile=C:\path\to\release.jks `
-  -PandroidReleaseStorePassword=YOUR_STORE_PASSWORD `
-  -PandroidReleaseKeyAlias=YOUR_KEY_ALIAS `
-  -PandroidReleaseKeyPassword=YOUR_KEY_PASSWORD
-```
-
-로컬 산출물 경로:
-- `app/build/outputs/bundle/prodRelease/app-prod-release.aab`
-
-Play 심사 전 체크:
-- `android.permission.QUERY_ALL_PACKAGES`는 제한 권한이므로 Play Console 권한 선언과 핵심 기능 소명이 필요합니다. 소명이 어렵다면 권한 제거 또는 더 좁은 package visibility 구현으로 바꿔야 합니다.
-- Notification Listener와 webhook 전달 기능은 알림 데이터 수집/전송 목적을 스토어 설명, 앱 내 안내, 개인정보처리방침, Data safety 항목에 정확히 써야 합니다.
-- Play Console 권한 선언 초안과 체크리스트는 `docs/play-store-readiness.md`에 정리되어 있습니다.
-
-## 보안
-- 토큰은 DB/로그에 평문 저장하지 않음
-- Rule 액션에는 `tokenRef`만 저장
-- 실제 토큰은 `EncryptedSharedPreferences`에 저장
+추가 변수는 `{{packageName}}`, `{{postedAt}}`와 `{{extras}}`입니다. HTTP 실패는 실행 기록에 남기며 네트워크 오류와 서버 오류는 백그라운드에서 재시도합니다. 공유 입력은 로그인 후 실행합니다. 로그아웃하면 새 알림 처리와 웹훅 재시도를 멈춥니다.

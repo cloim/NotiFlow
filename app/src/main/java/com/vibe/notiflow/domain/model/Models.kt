@@ -9,7 +9,19 @@ data class NotificationEvent(
     val title: String?,
     val text: String?,
     val extras: Map<String, String> = emptyMap(),
-    val postedAt: Long
+    val postedAt: Long,
+    val source: String = "notification",
+    val mimeType: String? = null,
+    val attachments: List<SharedAttachment> = emptyList(),
+    val eventId: String? = null
+)
+
+@Serializable
+data class SharedAttachment(
+    val name: String,
+    val mimeType: String,
+    val size: Long,
+    val base64: String
 )
 
 @Serializable

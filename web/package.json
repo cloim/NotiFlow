@@ -1,40 +1,32 @@
 {
   "name": "notiflow-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "sync:android": "node scripts/sync-assets.mjs",
     "build:android": "npm run build && npm run sync:android",
-    "test:android-icon": "node scripts/verify-android-app-icon.mjs",
-    "test:android-package": "node scripts/verify-android-package-id.mjs",
-    "test:github-update": "node scripts/verify-github-update.mjs",
-    "test:fcm-notifications": "node scripts/verify-fcm-notification-receiver.mjs",
-    "test:google-auth": "node scripts/verify-google-auth.mjs",
-    "test:push-token-registration": "node scripts/verify-push-token-registration.mjs",
-    "test:user-push-sender": "node scripts/verify-user-push-sender.mjs",
-    "test:received-notifications": "node scripts/verify-received-notification-tab.mjs",
-    "test:received-search": "node scripts/verify-received-notification-search.mjs",
-    "test:korean-ui": "node scripts/verify-korean-ui.mjs",
-    "test:safe-area": "node scripts/verify-safe-area-css.mjs",
-    "test:theme-ui": "node scripts/verify-theme-ui.mjs",
-    "test:topbar-ui": "node scripts/verify-topbar-ui.mjs",
-    "test:play-readiness": "node scripts/verify-play-readiness.mjs",
-    "test:pc-settings-server": "node scripts/verify-pc-settings-server.mjs",
-    "test:pc-rule-form": "node scripts/verify-pc-rule-form-parity.mjs",
-    "test:rule-transfer": "node scripts/verify-rule-transfer.mjs",
-    "test:rule-copy": "node scripts/verify-rule-copy.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "send:user-push": "node scripts/send-user-push.mjs"
+    "test": "node --test tests/rules.test.mjs",
+    "test:ui": "playwright test",
+    "test:layout": "node scripts/audit-layout.mjs"
   },
   "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.2.1",
+    "@radix-ui/react-tooltip": "^1.4.1",
+    "lucide-react": "^1.66.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.7.0",
-    "vite": "^5.4.20"
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.5"
   }
 }

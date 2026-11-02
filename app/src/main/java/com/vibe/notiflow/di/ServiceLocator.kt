@@ -8,6 +8,8 @@ import com.vibe.notiflow.domain.action.ActionRegistry
 import com.vibe.notiflow.domain.action.WebhookPostAction
 import com.vibe.notiflow.domain.engine.RuleEngine
 import com.vibe.notiflow.domain.filter.FilterRegistry
+import com.vibe.notiflow.domain.filter.EventSourceFilter
+import com.vibe.notiflow.domain.filter.MimeTypeFilter
 import com.vibe.notiflow.domain.filter.PackageEqualsFilter
 import com.vibe.notiflow.domain.filter.TextContainsFilter
 import com.vibe.notiflow.domain.filter.TextRegexFilter
@@ -31,7 +33,7 @@ object ServiceLocator {
     }
 
     private val filterRegistry: FilterRegistry by lazy {
-        FilterRegistry(listOf(PackageEqualsFilter(), TitleContainsFilter(), TextContainsFilter(), TextRegexFilter()))
+        FilterRegistry(listOf(PackageEqualsFilter(), TitleContainsFilter(), TextContainsFilter(), TextRegexFilter(), EventSourceFilter(), MimeTypeFilter()))
     }
     private val actionRegistry: ActionRegistry by lazy { ActionRegistry(listOf(WebhookPostAction(secureStore))) }
 

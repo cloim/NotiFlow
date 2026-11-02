@@ -1,5 +1,6 @@
 package com.vibe.notiflow.notification
 
+import com.google.firebase.auth.FirebaseAuth
 import android.app.Notification
 import android.os.Build
 import android.service.notification.NotificationListenerService
@@ -34,7 +35,7 @@ class NotiFlowNotificationListenerService : NotificationListenerService() {
         val title = extras?.getCharSequence("android.title")?.toString()
         val text = extras?.getCharSequence("android.text")?.toString()
 
-        if (saveOwnFcmNotificationIfNeeded(sbn, title, text)) return
+        if (FirebaseAuth.getInstance().currentUser == null) return
         if (!SourceNotificationPolicy.shouldProcessForRules(
                 sourcePackageName = sbn.packageName,
                 ownPackageName = packageName,
@@ -58,39 +59,4 @@ class NotiFlowNotificationListenerService : NotificationListenerService() {
         scope.launch { ServiceLocator.ruleEngine.process(event) }
     }
 
-    private fun saveOwnFcmNotificationIfNeeded(
-        sbn: StatusBarNotification,
-        title: String?,
-        text: String?
-    ): Boolean {
-        if (sbn.packageName != packageName) return false
-        if (sbn.tag?.startsWith("FCM-Notification:") != true) return false
-
-        val data = buildMap {
-            put("source", "fcm-auto-display")
-            put("notificationKey", sbn.key)
-            sbn.tag?.let { put("fcmTag", it) }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                sbn.notification.channelId?.let { put("channelId", it) }
-            }
-        }
-
-        Log.d("NotiFlow", "Persisting own Firebase auto-displayed notification: tag=${sbn.tag}")
-        scope.launch {
-            runCatching {
-                ServiceLocator.ruleRepository.saveReceivedNotification(
-                    ReceivedNotification(
-                        title = title,
-                        body = text,
-                        sender = sbn.packageName,
-                        data = data,
-                        receivedAt = sbn.postTime.takeIf { it > 0 } ?: System.currentTimeMillis()
-                    )
-                )
-            }.onFailure { error ->
-                Log.w("NotiFlow", "FCM auto-displayed notification save failed", error)
-            }
-        }
-        return true
-    }
 }

@@ -11,93 +11,42 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
-import org.json.JSONTokener
+import java.io.IOException
 
 interface EventAction {
     val type: String
     suspend fun execute(event: NotificationEvent, config: JsonObject): ActionResult
 }
-
 class ActionRegistry(actions: List<EventAction>) {
     private val map = actions.associateBy { it.type }
     fun get(type: String) = map[type]
 }
-
 class WebhookPostAction(private val secureStore: SecureStore) : EventAction {
     override val type = "webhook.post"
     private val client = OkHttpClient()
-    private val unknownPlaceholderRegex = Regex("\\{\\{[^}]+\\}\\}")
-
     override suspend fun execute(event: NotificationEvent, config: JsonObject): ActionResult {
-        val url = config["url"]?.jsonPrimitive?.contentOrNull ?: return ActionResult(false, "webhook url missing")
-        val method = config["method"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: "POST"
-        val tokenRef = config["tokenRef"]?.jsonPrimitive?.contentOrNull
-        val token = tokenRef?.let { secureStore.getSecret(it) }
-        val headers = config["headers"]?.jsonObject?.mapNotNull { (key, value) ->
-            value.jsonPrimitive.contentOrNull?.let { key to it }
-        }?.toMap().orEmpty()
-        val template = config["payloadTemplate"]?.jsonPrimitive?.contentOrNull
-
-        val body = runCatching { buildBody(template, event) }.getOrElse {
-            return ActionResult(false, "webhook payload invalid: ${it.message}", retryable = false)
-        }
-        val requestBuilder = Request.Builder().url(url)
-        when (method) {
-            "POST" -> requestBuilder.post(body.toRequestBody("application/json".toMediaType()))
-            "PUT" -> requestBuilder.put(body.toRequestBody("application/json".toMediaType()))
-            "PATCH" -> requestBuilder.patch(body.toRequestBody("application/json".toMediaType()))
-            else -> return ActionResult(false, "unsupported method: $method", retryable = false)
-        }
-
-        headers.forEach { (key, value) -> requestBuilder.addHeader(key, value) }
-        if (!token.isNullOrBlank() && headers.keys.none { it.equals("Authorization", ignoreCase = true) }) {
-            requestBuilder.addHeader("Authorization", "Bearer $token")
-        }
-        val req = requestBuilder.build()
-
-        return runCatching {
-            client.newCall(req).execute().use {
-                if (it.isSuccessful) ActionResult(true, "webhook ok")
-                else ActionResult(false, "webhook failed: ${it.code}", retryable = it.code >= 500)
+        return try {
+            val url = config["url"]?.jsonPrimitive?.contentOrNull ?: return ActionResult(false, "웹훅 URL을 설정해 주세요")
+            val method = config["method"]?.jsonPrimitive?.contentOrNull?.uppercase() ?: "POST"
+            require(method in setOf("POST", "PUT", "PATCH")) { "POST, PUT 또는 PATCH를 선택해 주세요" }
+            val template = config["payloadTemplate"]?.jsonPrimitive?.contentOrNull
+            val body = WebhookPayload.build(template, event).toRequestBody("application/json".toMediaType())
+            val request = Request.Builder().url(url).method(method, body)
+            val headers = config["headers"]?.jsonObject.orEmpty()
+            headers.forEach { (key, value) -> request.addHeader(key, value.jsonPrimitive.content) }
+            val tokenRef = config["tokenRef"]?.jsonPrimitive?.contentOrNull
+            val token = tokenRef?.let { secureStore.getSecret(it) }
+            if (!token.isNullOrBlank() && headers.keys.none { it.equals("Authorization", ignoreCase = true) }) {
+                request.addHeader("Authorization", "Bearer $token")
             }
-        }.getOrElse { ActionResult(false, "webhook exception: ${it.message}", retryable = true) }
-    }
-
-    private fun buildBody(template: String?, event: NotificationEvent): String {
-        val sourceTemplate = template?.takeIf { it.isNotBlank() } ?: return defaultBody(event)
-        var rendered = sourceTemplate
-        payloadVariables(event).forEach { (token, value) ->
-            rendered = rendered.replace(token, value)
-        }
-        if (unknownPlaceholderRegex.containsMatchIn(rendered)) {
-            error("unknown placeholder")
-        }
-
-        val jsonValue = JSONTokener(rendered).nextValue()
-        return when (jsonValue) {
-            is JSONObject -> jsonValue.toString()
-            is JSONArray -> jsonValue.toString()
-            else -> error("payload must be object or array")
+            client.newCall(request.build()).execute().use {
+                if (it.isSuccessful) ActionResult(true, "웹훅을 전송했어요 (HTTP ${it.code})")
+                else ActionResult(false, "서버가 HTTP ${it.code}로 응답했어요", retryable = it.code >= 500 || it.code == 429)
+            }
+        } catch (error: IOException) {
+            ActionResult(false, "네트워크 연결을 확인해 주세요", retryable = true)
+        } catch (error: Exception) {
+            ActionResult(false, "전송 설정을 확인해 주세요: ${error.message}", retryable = false)
         }
     }
-
-    private fun payloadVariables(event: NotificationEvent): Map<String, String> = mapOf(
-        "{{packageName}}" to JSONObject.quote(event.packageName),
-        "{{title}}" to jsonStringOrNull(event.title),
-        "{{text}}" to jsonStringOrNull(event.text),
-        "{{postedAt}}" to event.postedAt.toString(),
-        "{{extras}}" to JSONObject(event.extras).toString()
-    )
-
-    private fun jsonStringOrNull(value: String?): String = value?.let { JSONObject.quote(it) } ?: "null"
-
-    private fun defaultBody(event: NotificationEvent): String = JSONObject().apply {
-        put("packageName", event.packageName)
-        put("title", event.title)
-        put("text", event.text)
-        put("postedAt", event.postedAt)
-        put("extras", JSONObject(event.extras))
-    }.toString()
 }

@@ -43,3 +43,10 @@ web/dist/
 notiflow_ui.xml
 
 docs/
+
+# Local validation and signed release artifacts
+release/
+web/playwright-report/
+web/test-results/
+
+.worktrees/

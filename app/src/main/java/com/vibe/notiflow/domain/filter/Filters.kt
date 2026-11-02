@@ -44,3 +44,23 @@ class TextRegexFilter : EventFilter {
         return runCatching { Regex(pattern).containsMatchIn(event.text.orEmpty()) }.getOrDefault(false)
     }
 }
+
+class EventSourceFilter : EventFilter {
+    override val type = "source.equals"
+    override fun matches(event: NotificationEvent, config: JsonObject): Boolean =
+        event.source == config["value"]?.jsonPrimitive?.contentOrNull
+}
+
+class MimeTypeFilter : EventFilter {
+    override val type = "mime.matches"
+    override fun matches(event: NotificationEvent, config: JsonObject): Boolean {
+        if (event.source != "share") return false
+        val pattern = config["value"]?.jsonPrimitive?.contentOrNull?.lowercase() ?: return false
+        val types = event.attachments.map { it.mimeType } .ifEmpty { listOfNotNull(event.mimeType) }
+        return types.any { raw ->
+            val mime = raw.substringBefore(';').trim().lowercase()
+            pattern == "*/*" || mime == pattern ||
+                (pattern.endsWith("/*") && mime.startsWith(pattern.substringBefore('/') + "/"))
+        }
+    }
+}
