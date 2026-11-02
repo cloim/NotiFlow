@@ -7,9 +7,12 @@ import {
   Square,
   Server,
   ShieldCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { call, useFlow } from "./store.jsx";
 import { HeaderTooltip } from "./HeaderActions.jsx";
+import { Field } from "./components.jsx";
 
 function ConnectionField({ label, value, notify }) {
   async function copy(event) {
@@ -62,6 +65,13 @@ export default function Settings() {
   const [state, setState] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeDirty, setCodeDirty] = useState(false);
+  const [codeError, setCodeError] = useState("");
+  const [showCode, setShowCode] = useState(false);
+  useEffect(() => {
+    if (!codeDirty) setCode(state?.configuredAccessCode || "");
+  }, [state?.configuredAccessCode, codeDirty]);
   const refresh = useCallback(() => {
     if (!native) return;
     try {
@@ -86,6 +96,8 @@ export default function Settings() {
   async function changeServer() {
     setBusy(true);
     try {
+      if (state?.status !== "running" && codeDirty && !(await saveCode(false)))
+        return;
       await call(state?.status === "running" ? "stopServer" : "startServer");
       refresh();
     } catch (err) {
@@ -93,6 +105,19 @@ export default function Settings() {
     } finally {
       setBusy(false);
     }
+  }
+  async function saveCode(showToast) {
+    if (code && !/^[!-~]{8,128}$/.test(code)) {
+      setCodeError("공백 없이 영문, 숫자와 기호 8~128자로 입력해 주세요");
+      return false;
+    }
+    const next = await call("saveServerAccessCode", code);
+    setState(next);
+    setCodeDirty(false);
+    setCodeError("");
+    if (showToast)
+      notify(code ? "접속 코드를 저장했어요" : "자동 접속 코드를 사용해요");
+    return true;
   }
   const running = state?.status === "running";
   const starting = state?.status === "starting";
@@ -191,6 +216,71 @@ export default function Settings() {
                   )}
                 </div>
               )}
+              {!running && (
+                <div className="mt-5 space-y-3">
+                  <Field
+                    label="접속 코드"
+                    error={codeError}
+                    hint="공백 없이 영문, 숫자와 기호 8~128자 | 비워 두면 자동 생성"
+                  >
+                    {(props) => (
+                      <div className="flex items-center gap-2">
+                        <input
+                          {...props}
+                          className="field min-w-0 flex-1 font-mono text-xs"
+                          type={showCode ? "text" : "password"}
+                          value={code}
+                          disabled={busy || starting}
+                          autoComplete="new-password"
+                          spellCheck={false}
+                          onChange={(event) => {
+                            setCode(event.target.value);
+                            setCodeDirty(true);
+                            setCodeError("");
+                          }}
+                        />
+                        <HeaderTooltip
+                          label={
+                            showCode ? "접속 코드 숨기기" : "접속 코드 보기"
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl hover:bg-accent"
+                            aria-label={
+                              showCode ? "접속 코드 숨기기" : "접속 코드 보기"
+                            }
+                            aria-pressed={showCode}
+                            onClick={() => setShowCode(!showCode)}
+                          >
+                            {showCode ? (
+                              <EyeOff size={18} />
+                            ) : (
+                              <Eye size={18} />
+                            )}
+                          </button>
+                        </HeaderTooltip>
+                      </div>
+                    )}
+                  </Field>
+                  <button
+                    className="btn-secondary"
+                    disabled={busy || starting || !codeDirty}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await saveCode(true);
+                      } catch (err) {
+                        notify(err.message, "error");
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    접속 코드 저장
+                  </button>
+                </div>
+              )}
               {running && (
                 <div className="mt-5 space-y-4">
                   <ConnectionField
@@ -204,7 +294,11 @@ export default function Settings() {
                     notify={notify}
                   />
                   <p className="text-xs leading-6 text-muted">
-                    코드는 서버를 다시 실행할 때 바뀌어요
+                    {state.customAccessCode
+                      ? "지정한 코드는 서버를 다시 실행해도 유지돼요"
+                      : "자동 코드는 서버를 다시 실행할 때 바뀌어요"}
+                    <br />
+                    코드를 바꾸려면 서버를 중지해 주세요
                     <br />
                     로그아웃하거나 Tailscale 연결이 끊기면 서버가 종료됩니다
                   </p>
@@ -240,19 +334,25 @@ export default function Settings() {
             <h2 className="text-sm font-bold">다른 기기에서 접속하기</h2>
             <ol className="mt-4 space-y-3 text-sm leading-7 text-muted">
               <li className="flex gap-3">
-                <span className="font-mono text-primary">01</span>
+                <span className="shrink-0 whitespace-nowrap font-mono text-primary">
+                  01
+                </span>
                 <span>
                   휴대폰과 PC에서 Tailscale을 켜고 같은 네트워크에 연결해 주세요
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="font-mono text-primary">02</span>
+                <span className="shrink-0 whitespace-nowrap font-mono text-primary">
+                  02
+                </span>
                 <span>
                   앱에서 서버를 실행하고 PC 브라우저로 접속 주소를 열어 주세요
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="font-mono text-primary">03</span>
+                <span className="shrink-0 whitespace-nowrap font-mono text-primary">
+                  03
+                </span>
                 <span>
                   접속 코드를 입력하면 이 휴대폰의 규칙과 실행 기록이 표시돼요
                 </span>

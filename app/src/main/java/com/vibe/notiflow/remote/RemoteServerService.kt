@@ -70,8 +70,9 @@ class RemoteServerService : Service() {
             try {
                 owner = auth.currentUser?.uid ?: error("Google 계정으로 로그인해 주세요")
                 val host = TailscaleAddress.find() ?: error("Tailscale 앱에서 연결을 켠 뒤 다시 실행해 주세요")
-                val code = ByteArray(18).also { SecureRandom().nextBytes(it) }
-                    .joinToString("") { "%02x".format(it.toInt() and 255) }
+                val code = RemoteAccessCode(ServiceLocator.secureStore).get(checkNotNull(owner))
+                    ?: ByteArray(18).also { SecureRandom().nextBytes(it) }
+                        .joinToString("") { "%02x".format(it.toInt() and 255) }
                 val rules = RuleManagement(ServiceLocator.ruleRepository)
                 val http = RemoteHttpServer(host, PORT, code,
                     authorized = { auth.currentUser?.uid == owner && TailscaleAddress.find() == host },

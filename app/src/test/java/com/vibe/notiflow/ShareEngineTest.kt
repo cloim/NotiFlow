@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShareEngineTest {
@@ -41,8 +42,9 @@ class ShareEngineTest {
             ActionRegistry(listOf(action)), mockk<RetryScheduler>(relaxed = true))
         val event = NotificationEvent("share", "사진", "공유", postedAt = 1,
             source = "share", mimeType = "image/png", eventId = "first")
-        engine.process(event)
+        assertEquals("웹훅 실행 성공", engine.process(event).shareMessage())
         engine.process(event.copy(eventId = "second"))
+        assertTrue(engine.process(event.copy(eventId = "second")).duplicate)
         assertEquals(listOf("first", "second"), executed)
         assertEquals(listOf(1L, 1L), logs.map { it.ruleId })
     }
@@ -53,7 +55,34 @@ class ShareEngineTest {
         coEvery { repository.getEnabledRulesForPackage("share") } returns emptyList()
         coEvery { repository.insertLog(capture(logs)) } returns Unit
         val engine = RuleEngine(repository, FilterRegistry(emptyList()), ActionRegistry(emptyList()), mockk())
-        engine.process(NotificationEvent("share", "파일", null, postedAt = 1, source = "share", eventId = "no-rule"))
+        val result = engine.process(NotificationEvent("share", "파일", null, postedAt = 1, source = "share", eventId = "no-rule"))
         assertEquals("NO_MATCH", logs.single().result)
+        assertEquals("공유 실패: 실행할 웹훅 규칙이 없어요", result.shareMessage())
+    }
+
+    @Test fun shareFeedbackReflectsAllActualWebhookActionResults() = runTest {
+        for (outcomes in listOf(listOf(true), listOf(false), listOf(true, false))) {
+            val pending = outcomes.toMutableList()
+            val repository = mockk<RuleRepository>()
+            val action = object : EventAction {
+                override val type = "webhook.post"
+                override suspend fun execute(event: NotificationEvent, config: JsonObject) = ActionResult(pending.removeAt(0), "result")
+            }
+            val rule = Rule(1, "공유", true, 100, emptyList(),
+                listOf(FilterSpec("source.equals", buildJsonObject { put("value", "share") })),
+                actions = outcomes.map { ActionSpec("webhook.post", buildJsonObject {}) })
+            coEvery { repository.getEnabledRulesForPackage("share") } returns listOf(rule)
+            coEvery { repository.insertLog(any()) } returns Unit
+            val engine = RuleEngine(repository, FilterRegistry(listOf(EventSourceFilter())),
+                ActionRegistry(listOf(action)), mockk(relaxed = true))
+            val result = engine.process(NotificationEvent("share", "링크", "https://example.com/", postedAt = 1, source = "share"))
+            assertEquals(outcomes.count { it }, result.successfulActions)
+            assertEquals(outcomes.count { !it }, result.failedActions)
+            when {
+                outcomes.all { it } -> assertEquals("웹훅 실행 성공", result.shareMessage())
+                outcomes.none { it } -> assertTrue(result.shareMessage().startsWith("웹훅 실행 실패"))
+                else -> assertEquals("웹훅 일부 실패: 성공 1건, 실패 1건", result.shareMessage())
+            }
+        }
     }
 }

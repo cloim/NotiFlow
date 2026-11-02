@@ -26,15 +26,17 @@ class RuleEngine(
         runCatching { Log.d("NotiFlow", message) }
     }
 
-    suspend fun process(event: NotificationEvent) = mutex.withLock {
+    suspend fun process(event: NotificationEvent): ProcessingSummary = mutex.withLock {
         val now = System.currentTimeMillis()
         val key = event.eventId ?: "${event.source}:${event.packageName}:${event.title}:${event.text}"
-        dedupe[key]?.let { if (now - it < 5_000) { logDebug("Dedupe skip"); return@withLock } }
+        dedupe[key]?.let { if (now - it < 5_000) { logDebug("Dedupe skip"); return@withLock ProcessingSummary(duplicate = true) } }
         dedupe[key] = now
         if (dedupe.size > 500) dedupe.remove(dedupe.entries.first().key)
 
         val rules = repository.getEnabledRulesForPackage(event.packageName).sortedByDescending { it.priority }
         var executed = false
+        var succeeded = 0
+        var failed = 0
         logDebug("RuleEngine.process: pkg=${event.packageName} rules=${rules.size}")
         for (rule in rules) {
             if (event.source != "share" && now - (rateLimit[rule.id] ?: 0L) < 2_000) continue
@@ -104,6 +106,7 @@ class RuleEngine(
                 val handler = actions.get(action.type) ?: continue
                 executed = true
                 val result = handler.execute(event, action.config)
+                if (result.success) succeeded++ else failed++
                 repository.insertLog(ExecutionLog(ruleId = rule.id, matched = true, result = if (result.success) "SUCCESS" else "FAILED", message = result.message, executedAt = now, eventPackage = event.packageName, eventTitle = event.title))
                 if (!result.success && result.retryable && action.type == "webhook.post") {
                     retryScheduler.scheduleWebhookRetry(rule.id, action, event)
@@ -117,5 +120,6 @@ class RuleEngine(
                 message = "공유 콘텐츠와 일치하는 활성 규칙이 없어요", executedAt = now,
                 eventPackage = "share", eventTitle = event.title))
         }
+        ProcessingSummary(succeeded, failed)
     }
 }

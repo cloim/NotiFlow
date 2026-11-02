@@ -11,6 +11,7 @@ for (const width of [1440, 390, 325]) {
     await page.addInitScript(() => {
       const ok = (data) => JSON.stringify({ ok: true, data });
       let state = { status: "stopped", tailscaleConnected: false };
+      let savedCode = "";
       window.NotiFlowNative = {
         getAuthState: () => ok({ signedIn: true, displayName: "검증 계정" }),
         getShareState: () => ok({}),
@@ -19,7 +20,20 @@ for (const width of [1440, 390, 325]) {
         listRules: () => ok({ rules: [] }),
         listLogs: () => ok({ logs: [] }),
         isNotificationListenerEnabled: () => true,
-        getServerState: () => ok(state),
+        getServerState: () =>
+          ok({
+            ...state,
+            configuredAccessCode: savedCode,
+            customAccessCode: Boolean(savedCode),
+          }),
+        saveServerAccessCode: (value) => {
+          savedCode = value;
+          return ok({
+            ...state,
+            configuredAccessCode: savedCode,
+            customAccessCode: Boolean(savedCode),
+          });
+        },
         startServer: () => {
           if (!state.tailscaleConnected)
             return JSON.stringify({
@@ -32,7 +46,7 @@ for (const width of [1440, 390, 325]) {
               status: "running",
               tailscaleConnected: true,
               url: "http://100.100.100.100:8186/",
-              accessCode: "test-code-for-ui",
+              accessCode: savedCode || "test-code-for-ui",
             };
           }, 100);
           return ok(state);
@@ -89,7 +103,58 @@ for (const width of [1440, 390, 325]) {
     await expect(
       page.getByRole("button", { name: "서버 실행", exact: true }),
     ).toBeVisible();
-    await expect(page.getByLabel("접속 코드", { exact: true })).toHaveCount(0);
+    const editor = page.getByLabel("접속 코드", { exact: true });
+    await expect(editor).toBeEditable();
+    await expect(editor).toHaveValue("");
+    await editor.fill("123");
+    await page
+      .getByRole("button", { name: "접속 코드 저장", exact: true })
+      .click();
+    await expect(
+      page.getByText("공백 없이 영문, 숫자와 기호 8~128자로 입력해 주세요", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await editor.fill("my-fixed-code-2026");
+    await page
+      .getByRole("button", { name: "접속 코드 저장", exact: true })
+      .click();
+    await expect(
+      page.getByText("접속 코드를 저장했어요", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: "규칙 목록으로", exact: true })
+      .click();
+    await page.getByRole("button", { name: "계정 메뉴", exact: true }).click();
+    await page.getByRole("menuitem", { name: "설정", exact: true }).click();
+    await expect(editor).toHaveValue("my-fixed-code-2026");
+    await expect(editor).toHaveAttribute("type", "password");
+    await page
+      .getByRole("button", { name: "접속 코드 보기", exact: true })
+      .click();
+    await expect(editor).toHaveAttribute("type", "text");
+    await checkKoreanWords(page);
+    await page.screenshot({
+      path: `../docs/validation/settings-custom-code-${width}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "서버 실행", exact: true }).click();
+    await expect(editor).toHaveValue("my-fixed-code-2026");
+    await expect(
+      page.getByText("지정한 코드는 서버를 다시 실행해도 유지돼요", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "서버 중지", exact: true }).click();
+    await expect(editor).toBeEditable();
+    await expect(editor).toHaveValue("my-fixed-code-2026");
+    await editor.fill("");
+    await page
+      .getByRole("button", { name: "접속 코드 저장", exact: true })
+      .click();
+    await expect(
+      page.getByText("자동 접속 코드를 사용해요", { exact: true }),
+    ).toBeVisible();
   });
 }
 

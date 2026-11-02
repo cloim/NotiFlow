@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.vibe.notiflow.remote.RemoteServerService
 import com.vibe.notiflow.remote.TailscaleAddress
+import com.vibe.notiflow.remote.RemoteAccessCode
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -56,7 +57,6 @@ class MainActivity : ComponentActivity() {
     private val auth by lazy { FirebaseAuth.getInstance() }
     private val credentials by lazy { CredentialManager.create(this) }
     private val inbox by lazy { ShareInbox(this) }
-    private var shareState = JSONObject()
     private var updateState = JSONObject().put("busy", false)
     private var lastUpdateUrl: String? = null
     private var authError: String? = null
@@ -110,7 +110,6 @@ class MainActivity : ComponentActivity() {
                 webView.evaluateJavascript("window.dispatchEvent(new Event('notiflowBack'))", null)
             }
         })
-        if (savedInstanceState == null) receiveShare(intent)
         auth.currentUser?.let { inbox.enqueuePending(it.uid) }
     }
 
@@ -126,28 +125,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        receiveShare(intent)
         if (intent.getBooleanExtra("openSettings", false)) {
             webView.evaluateJavascript("window.location.hash = '/settings'", null)
-        }
-    }
-
-    private fun receiveShare(incoming: Intent) {
-        if (incoming.action !in setOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)) return
-        shareState = JSONObject().put("busy", true)
-        emit("notiflowShareChanged", shareState)
-        lifecycleScope.launch {
-            runCatching { withContext(Dispatchers.IO) { inbox.receive(incoming) } }
-                .onSuccess { event ->
-                    shareState = JSONObject().put("busy", false).put("received", true)
-                        .put("title", event.title).put("mimeType", event.mimeType)
-                        .put("fileCount", event.attachments.size)
-                        .put("waitingForLogin", auth.currentUser == null)
-                    auth.currentUser?.let { inbox.enqueuePending(it.uid) }
-                }.onFailure {
-                    shareState = JSONObject().put("busy", false).put("error", it.message ?: "공유를 다시 시도해 주세요")
-                }
-            emit("notiflowShareChanged", shareState)
         }
     }
 
@@ -192,10 +171,6 @@ class MainActivity : ComponentActivity() {
                 val google = GoogleIdTokenCredential.createFrom(credential.data)
                 auth.signInWithCredential(GoogleAuthProvider.getCredential(google.idToken, null)).await()
                 auth.currentUser?.let { inbox.enqueuePending(it.uid) }
-                if (shareState.optBoolean("waitingForLogin")) {
-                    shareState.put("waitingForLogin", false)
-                    emit("notiflowShareChanged", shareState)
-                }
             } catch (_: GetCredentialCancellationException) {
                 // Choosing later returns to the same login screen.
             } catch (error: Exception) {
@@ -216,9 +191,16 @@ class MainActivity : ComponentActivity() {
         runBlocking(Dispatchers.IO) { ruleManagement.execute(method, args) }
     }
 
+    private fun serverState(): JSONObject {
+        signedIn()
+        val saved = RemoteAccessCode(ServiceLocator.secureStore).get(checkNotNull(auth.currentUser).uid)
+        return RemoteServerService.snapshot().put("configuredAccessCode", saved.orEmpty())
+            .put("customAccessCode", saved != null)
+    }
+
     inner class Bridge {
         @JavascriptInterface fun getAuthState(): String = response { authState() }
-        @JavascriptInterface fun getShareState(): String = response { shareState }
+        @JavascriptInterface fun getShareState(): String = response { JSONObject() }
         @JavascriptInterface fun getUpdateState(): String = response { updateState }
         @JavascriptInterface fun getAppInfo(): String = JSONObject().put("versionName", BuildConfig.VERSION_NAME).toString()
         @JavascriptInterface fun setSystemBarsTheme(light: Boolean) { runOnUiThread { setBars(light) } }
@@ -242,7 +224,15 @@ class MainActivity : ComponentActivity() {
             ruleResponse("setRuleEnabled", JSONArray().put(id).put(enabled))
         @JavascriptInterface fun deleteRule(id: Long): String = ruleResponse("deleteRule", JSONArray().put(id))
         @JavascriptInterface fun listLogs(limit: Int): String = ruleResponse("listLogs", JSONArray().put(limit))
-        @JavascriptInterface fun getServerState(): String = response { signedIn(); RemoteServerService.snapshot() }
+        @JavascriptInterface fun getServerState(): String = response { serverState() }
+        @JavascriptInterface fun saveServerAccessCode(value: String): String = response {
+            signedIn()
+            check(RemoteServerService.snapshot().optString("status") !in setOf("running", "starting")) {
+                "서버를 중지한 뒤 접속 코드를 변경해 주세요"
+            }
+            RemoteAccessCode(ServiceLocator.secureStore).save(checkNotNull(auth.currentUser).uid, value)
+            serverState()
+        }
         @JavascriptInterface fun startServer(): String = response {
             signedIn()
             check(TailscaleAddress.find() != null) { "Tailscale 앱에서 연결을 켠 뒤 다시 실행해 주세요" }
